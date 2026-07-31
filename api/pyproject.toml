@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "auditable-nl2sql"
+version = "0.1.0.dev0"
+description = "Auditable, read-only NL2SQL workflow over synthetic enterprise data"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+auditable-nl2sql-demo = "auditable_nl2sql.demo:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/auditable_nl2sql"]

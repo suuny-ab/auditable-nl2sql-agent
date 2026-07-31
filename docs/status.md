@@ -6,13 +6,14 @@
 | --- | --- |
 | `state` | `ready` |
 | 更新时间 | `2026-07-31` |
-| 最近完成 | `READONLY-SQL-001`：合成 SQLite 数据、schema 读取、只读 SQL 执行 |
-| 做什么 | 建立可重复数据库事实层，并用数据库只读模式和 SQLite authorizer 双层拦截写操作 |
-| 不做什么 | 本切片不接 LangGraph、LLM、FastAPI、trajectory、审批页面、Docker 或真实数据 |
-| 完成门 | 4 表 schema 可读；固定聚合查询结果可复验；写/DDL/ATTACH/PRAGMA 被拒且数据未变化；行数硬上限有测试 |
-| 风险 | `R0`：仅本地合成数据，无网络、费用、Provider 或外部写入 |
-| 项目基线 | 公开仓库 `suuny-ab/auditable-nl2sql-agent`；`origin/main` 为 `429b440` |
-| 阻碍 | 无 |
+| 最近完成 | `WORKFLOW-CORE-002`：离线 LangGraph 状态机、独立 checkpoint、稳定 trajectory 与失败终态 |
+| 前序能力 | `READONLY-SQL-001`：合成 SQLite 数据、schema 读取、只读 SQL 执行 |
+| 做什么 | 用确定性 SQL stub 串联 schema 与只读执行；持久化 run/checkpoint/trajectory，并记录成功或失败终态 |
+| 不做什么 | 未接 LLM、审批恢复、自动重试、FastAPI、网页、Docker、Postgres 或完整评测 |
+| 完成门 | 锁定依赖干净安装；成功、失败、写操作拒绝、未知问题、缺失 schema、重复 run 与独立进程回查均通过测试；业务库不变 |
+| 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
+| 项目基线 | 本地分支 `codex/offline-workflow-core` 基于 `7f7ab5c`；公开 `origin/main` 仍为 `429b440` |
+| 阻碍 | 无工程阻碍；本切片尚未获得推送授权，更新后的 GitHub Actions 尚未远端运行 |
 
 ## 复用审查
 
@@ -40,9 +41,25 @@
 
 ## 下一候选
 
-下一切片候选是定义 LangGraph 最小状态、确定性 stub 节点与持久化 trajectory，让一次运行可
-按 run ID 回查并验证失败终态。FastAPI、审批门、评测、网页与 Docker 按依赖顺序后续进入，
-不在本轮顺手实现。
+下一切片候选是审批门与真正的中断/恢复：高危 SQL 在执行前持久化挂起，批准或拒绝后使用
+同一 run ID 恢复，并验证重复决定和进程重启边界。真实 LLM、FastAPI、评测、网页与 Docker
+继续后置。
+
+## WORKFLOW-CORE-002 验证证据
+
+- `langgraph==1.2.9`、`langgraph-checkpoint==4.1.1`、
+  `langgraph-checkpoint-sqlite==3.1.0` 及全部传递依赖已从 hash 锁文件安装到全新
+  Python `3.13.12` 虚拟环境；`pip check` 为 `No broken requirements found`。
+- `PYTHONPATH=api/src python -m unittest discover -s api/tests -p "test_*.py" -v`：
+  `Ran 16 tests in 1.862s`，`OK`；其中 7 条为工作流定向测试、8 条为原数据库回归、
+  1 条钉定 pyproject / 顶层 requirements / hash 锁一致性。
+- 成功 run 得到 `completed`、`5946.0` 和 `load_schema/draft_sql/execute_sql/finish` 四条
+  有序 trajectory；失败路径固定自动重试 `0`，执行尝试最多 `1`。
+- 独立第二 Python 进程使用会抛错的 generator 构造 runner，仍能只读回原 run，证明
+  `get_run` 不会重新执行节点；这只证明持久化回查，不证明中断恢复。
+- 成功、执行错误和写操作拒绝测试均比较业务库 SHA-256；workflow 表只存在于独立状态库。
+- `compileall`、空白检查、公开内容扫描通过。CI 已改为 Python 3.13 从 hash 锁安装，但该
+  候选尚未推送，不能声称新的远端 CI 已通过。
 
 ## LangGraph 最小风险探针
 

@@ -11,8 +11,8 @@
 | 不做什么 | 本切片不接 LangGraph、LLM、FastAPI、trajectory、审批页面、Docker 或真实数据 |
 | 完成门 | 4 表 schema 可读；固定聚合查询结果可复验；写/DDL/ATTACH/PRAGMA 被拒且数据未变化；行数硬上限有测试 |
 | 风险 | `R0`：仅本地合成数据，无网络、费用、Provider 或外部写入 |
-| 项目基线 | 公开仓库 `suuny-ab/auditable-nl2sql-agent`；首次推送后以 `origin/main` 为权威 Git 基线 |
-| 阻碍 | 无工程阻碍；首次 GitHub Actions 结果需在推送后核验 |
+| 项目基线 | 公开仓库 `suuny-ab/auditable-nl2sql-agent`；`origin/main` 为 `429b440` |
+| 阻碍 | 无 |
 
 ## 复用审查
 
@@ -34,6 +34,9 @@
 - `.github/workflows/ci.yml` 已配置 Python 3.13 编译和相同单测；远端当前结论以
   [GitHub Actions](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/workflows/ci.yml)
   为准，不得把本地绿色写成远端 CI 已通过。
+- 首次公开推送 SHA `429b44007e7848317fcccd3199a168ff97fc8075`；GitHub Actions
+  [run 30628166219](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30628166219)
+  在该 SHA 上完成，结论为 `success`。
 
 ## 下一候选
 

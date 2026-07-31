@@ -39,6 +39,7 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
 - schema 读取返回用户表、字段、主键和外键，不暴露 SQLite 内部表。
 - SQL 执行同时受 URI `mode=ro`、`query_only` 和 SQLite authorizer 约束，并限制返回行数和
   本地执行时间；写入、DDL、`ATTACH` 和 `PRAGMA` 失败关闭。
-- 首切片 7 个测试已在本地通过；这只证明 SQLite 事实层，不是完整 NL2SQL 或 Agent 能力。
+- 首切片 8 个测试已在本地和首次 GitHub Actions 中通过；这只证明 SQLite 事实层，不是完整
+  NL2SQL 或 Agent 能力。
 
 LangGraph、模型生成、trajectory、审批门、FastAPI、网页、评测集和 Docker 仍待实现。

@@ -42,4 +42,5 @@
 - 2026-07-31 本地 Python 3.14.2：8 个 `unittest` 全部通过，发布前复跑耗时 `0.259s`。
 - `compileall` 退出码 `0`；CLI 创建数据库后读回 4 张表和 6 笔订单。
 - 固定非取消订单销售额为 `5946.0`；越界语句拒绝后订单数与 schema 保持不变。
-- GitHub workflow 已落盘但尚未远端运行；没有 CI 回执、LangGraph、LLM、API 或完整评测结论。
+- GitHub Actions run `30628166219` 已在首次公开推送 SHA `429b440` 上通过；仍没有正式
+  LangGraph 工作流、LLM、API 或完整评测结论。

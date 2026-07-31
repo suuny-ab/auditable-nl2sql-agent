@@ -43,3 +43,18 @@
 下一切片候选是定义 LangGraph 最小状态、确定性 stub 节点与持久化 trajectory，让一次运行可
 按 run ID 回查并验证失败终态。FastAPI、审批门、评测、网页与 Docker 按依赖顺序后续进入，
 不在本轮顺手实现。
+
+## LangGraph 最小风险探针
+
+2026-07-31 在 Git 忽略的临时目录中完成，不包含正式产品代码或项目依赖变更：
+
+- 隔离 Python `3.13.12` 成功安装 `langgraph==1.2.9`、
+  `langgraph-checkpoint==4.1.1`、`langgraph-checkpoint-sqlite==3.1.0`。
+- 第一进程运行 `draft_sql → execute_sql → finish` 三节点图，真实调用现有只读执行器，
+  `probe-run-001` 得到 `completed`、`5946.0`、5 个 checkpoint 和 3 条 JSON trajectory。
+- 第二个独立 Python 进程没有执行节点，通过公开 `get_state/get_state_history` API 从独立
+  workflow SQLite 读回相同 run、终态、结果和 trajectory。
+- 业务库探针前、第一进程后、第二进程后的 SHA-256 均为
+  `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`；仍为 4 表、6 笔订单。
+- 结论：候选依赖、Python 3.13、严格 MessagePack、独立 SQLite checkpoint 和公开 API
+  trajectory 投影的核心可行性已通过；失败终态、正式依赖锁和产品结构仍须在下一切片实现。

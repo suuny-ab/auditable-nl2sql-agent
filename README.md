@@ -4,9 +4,11 @@
 
 一个只使用合成数据的可审计 NL2SQL 作品集项目。当前已具备确定性离线 LangGraph 工作流：
 固定问题经过 schema 读取、SQL stub、机械只读执行，形成独立 SQLite checkpoint 和可按 run ID
-回查的 JSON trajectory。真实模型生成、审批恢复和完整 Agent 体验尚未实现。
+回查的 JSON trajectory。高行数和写操作查询会在执行前持久化挂起，可使用同一 run ID 在
+另一进程批准或拒绝；批准仍不能绕过机械只读边界。
 
-当前 SQL stub 只是可重复的工作流替身，不构成真实 NL2SQL 能力或正确率主张。
+当前 SQL stub 只是可重复的工作流替身，不构成真实 NL2SQL 能力或正确率主张。真实模型、
+证据回答、API、网页、评测和 Docker 仍待实现。
 
 ## 当前目录
 

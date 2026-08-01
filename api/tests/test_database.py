@@ -11,6 +11,7 @@ from auditable_nl2sql.database import (
     ReadOnlyViolation,
     execute_read_only,
     read_schema,
+    validate_read_only_statement,
 )
 from auditable_nl2sql.demo import create_demo_database
 
@@ -120,6 +121,33 @@ class ReadOnlyDatabaseTests(unittest.TestCase):
                 "SELECT 1; SELECT 2",
             )
 
+    def test_statement_validation_uses_the_read_only_authorizer(self) -> None:
+        original_count = self._order_count()
+
+        self.assertIsNone(
+            validate_read_only_statement(
+                self.database_path,
+                "SELECT order_id FROM orders LIMIT 2",
+            )
+        )
+        with self.assertRaises(ReadOnlyViolation):
+            validate_read_only_statement(
+                self.database_path,
+                "DELETE FROM orders WHERE order_id = 'O1001'",
+            )
+        with self.assertRaises(ReadOnlyViolation):
+            validate_read_only_statement(
+                self.database_path,
+                "PRAGMA user_version",
+            )
+        with self.assertRaises(QueryExecutionError):
+            validate_read_only_statement(
+                self.database_path,
+                "SELECT missing_column FROM orders",
+            )
+
+        self.assertEqual(self._order_count(), original_count)
+
     def test_demo_database_refuses_to_overwrite(self) -> None:
         with self.assertRaises(FileExistsError):
             create_demo_database(self.database_path)
@@ -129,6 +157,12 @@ class ReadOnlyDatabaseTests(unittest.TestCase):
             execute_read_only(self.database_path, "SELECT 1", max_rows=0)
         with self.assertRaises(ValueError):
             execute_read_only(self.database_path, "SELECT 1", timeout_seconds=0)
+        with self.assertRaises(ValueError):
+            validate_read_only_statement(
+                self.database_path,
+                "SELECT 1",
+                timeout_seconds=0,
+            )
 
 
 if __name__ == "__main__":

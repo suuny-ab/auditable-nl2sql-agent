@@ -6,14 +6,14 @@
 | --- | --- |
 | `state` | `ready` |
 | 更新时间 | `2026-08-01` |
+| 当前切片 | `MODEL-EVAL-RUNNER-013`：已完成 20 条单次真实基线、结构化报告与三个固定指标 |
 | 最近完成 | `PROVIDER-DECISION-CONTRACT-012`：五类严格 action、稳定终态与越权审批路由 |
-| 前序能力 | `PROVIDER-DECISION-PROBE-011`：4 条真实调用验证候选分类可分 |
-| 做什么 | 正式接入 `unsafe_operation`；投影 `provider_action`；固定三类无 SQL 终态 |
-| 不做什么 | 不调用真实 Provider，不跑 20 条评测或指标，不做 API/网页/Docker，不新增依赖 |
-| 完成门 | 已满足：五类严格 plan；三类稳定零执行终态；越权审批不可执行；43 项测试通过 |
-| 风险 | `run-record-v5` 已版本化决策字段；模型 action 与 SQLite 机械只读边界均有独立回归测试 |
-| 项目基线 | Draft PR #8：`codex/provider-decision-contract` → `main@ee4758b` |
-| 阻碍 | 无工程阻碍；PR #8 等待评审，publication head `e103dc5` 的远端 CI 已通过 |
+| 做什么 | 冻结 20 条各调用一次；保存逐案例 trajectory/usage；计算并核验三个指标 |
+| 不做什么 | 不改产品合同或 prompt，不做 API/网页/Docker，不重试或重复刷分，不新增依赖 |
+| 完成门 | 已满足：20/20 回执、三项指标、越权执行 0、逐案例业务库哈希不变、自动重试 0 |
+| 风险 | 首次基线答案正确率为 `14/20`；2 条非成功类别被误路由并执行只读 SQL，需保留为真实误差 |
+| 项目基线 | Draft PR #9：`codex/model-eval-runner` → `main@0e960289`；implementation head `91aaa20` |
+| 阻碍 | 无工程阻碍；Draft PR #9 等待评审，本轮不转 Ready、不合并 |
 
 ## 复用审查
 
@@ -139,9 +139,31 @@
 - Python `3.13.12` Provider 定向 10 项、全量 43 项测试通过；编译、依赖、差异、凭据模式、
   `.local` 跟踪和产品依赖方向检查通过。本轮真实 Provider 调用与 token 消耗均为 0。完整合同见
   [`docs/work/provider-decision-contract.md`](work/provider-decision-contract.md)。
-- [Draft PR #8](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/8) 已创建；
-  [CI run 30693992922](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30693992922)
-  在 publication head `e103dc5` 上完成，结论为 `success`。
+- [PR #8](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/8) 已合并为 `0e960289`；
+  [main CI run 30695247832](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30695247832)
+  在该 merge commit 上完成，结论为 `success`。
+
+## MODEL-EVAL-RUNNER-013 验证证据
+
+- 版本化 `model-evaluation-report-v1` 已实现：逐案例保存初始状态、模拟审批、最终 run record、完整
+  trajectory、脱敏 usage、数据集/业务库哈希、判定理由和三个指标；报告与 checkpoint 均拒绝覆盖。
+- 理想确定性 20 条恰好各运行一次，得到执行成功率 `8/8`、答案正确率 `20/20`、人工介入率
+  `4/20`；3 条越权案例执行次数合计为 0，业务库逐案例及整轮哈希不变。
+- 一条故意错误的注入查询使答案正确率精确降为 `19/20`，并记录一次非成功路径 SQL 执行，证明
+  评测器不会把可执行但语义错误的模型输出计为正确。
+- Python `3.13.12` 新增 2 项评测器测试、全量 45 项测试通过；编译、依赖、差异、凭据模式、
+  `.local` 跟踪和产品依赖方向检查通过。
+- 首次真实固定基线 `baseline-20260801T101307Z` 对 20 条冻结案例各调用一次，自动重试为 `0`；
+  执行成功率 `7/8`、答案正确率 `14/20`、人工介入率 `7/20`。
+- 20 条均有脱敏 usage：prompt `17664`、completion `1567`、total `19231` tokens。3 条越权案例
+  执行次数均为 0，越权执行总数为 0；业务库整轮前后及逐案例哈希全部不变。
+- 误差包括 1 条成功问题被判为无答案、3 条成功问题发生非预期审批，以及歧义/无答案各 1 条被
+  错误路由为只读查询。结果按首次单次运行保留，没有调参、补跑或重复刷分。
+- 完整指标口径、模拟审批边界与真实回执见
+  [`docs/work/model-eval-runner.md`](work/model-eval-runner.md)。
+- [Draft PR #9](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/9) 已创建；
+  [CI run 30695678436](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30695678436)
+  在 implementation head `91aaa20` 上完成，结论为 `success`。
 
 
 ## EVAL-DATASET-008 验证证据
@@ -187,11 +209,11 @@
 - 完整合同、指纹和声明边界见
   [`docs/work/evidence-fingerprint-probe.md`](work/evidence-fingerprint-probe.md)。
 
-## 下一候选
+## 当前检查点
 
-下一步候选是模型评测运行器：读取已冻结的 20 条合成案例，显式启用 Provider，每条固定一次且
-不自动重试，保存结构化 trajectory 与脱敏 usage，并计算执行成功率、答案正确率、人工介入率。
-该切片不改产品决策合同、API/网页/Docker；真实调用、费用和凭据使用须在开工当轮单独确认。
+评测运行器与首次真实 20 条固定基线均已完成并发布为 Draft PR #9；保留
+`7/8`、`14/20`、`7/20` 原始基线，不做 prompt 调优或补跑。下一步是评审与合并；合并后再决定
+是否进入 FastAPI 的只读任务/轨迹查询最小切片。
 
 ## 审批中断/恢复最小风险探针
 

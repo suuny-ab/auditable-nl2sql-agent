@@ -56,4 +56,6 @@
 - Python `3.13.12`：`python -m unittest discover -s api/tests -p "test_*.py" -v` 得到
   `Ran 25 tests`、`OK`；`compileall`、`pip check` 和 `git diff --check` 通过。
 - 成功、执行错误、写操作审批拒绝和截断集成测试均在前后比较业务数据库 SHA-256，结果不变。
-- 本切片未增加依赖、未调用 Provider、未推送远端；因此没有本提交的远端 CI 结论。
+- 本切片未增加依赖、未调用 Provider。[Draft PR #3](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/3)
+  已创建；[CI run 30687228936](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30687228936)
+  在 implementation SHA `150af40` 上完成，结论为 `success`。

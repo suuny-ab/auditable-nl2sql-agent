@@ -4,16 +4,16 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `ready` |
+| `state` | `review_pending` |
 | 更新时间 | `2026-08-01` |
-| 最近完成 | `EVIDENCE-ANSWER-007`：由完整 evidence 生成带精确来源的确定性 `answer-v1` |
-| 前序能力 | `RESULT-EVIDENCE-006`：结果失败关闭校验、版本化 evidence、跨进程指纹重算 |
-| 做什么 | evidence 验证通过后生成保守回答，绑定指纹和精确结果路径，并持久化到 run record |
-| 不做什么 | 未接 LLM、业务语义判断或生成、FastAPI、网页、Docker、Postgres 或完整评测 |
-| 完成门 | 单值/零行/多行回答可回查；指纹不匹配、合同异常和失败路径无回答；跨进程一致；业务库不变 |
+| 最近完成 | `EVAL-DATASET-008`：冻结 20 条 `8/3/3/3/3` 合成 gold contract 并复算参考 SQL |
+| 前序能力 | `EVIDENCE-ANSWER-007`：由完整 evidence 生成带精确来源的确定性 `answer-v1` |
+| 做什么 | 固定问题、类别、参考 SQL/空值、终态、审批和结果，并机器校验 gold contract |
+| 不做什么 | 未调用模型、未计算指标、未调提示词、未改工作流、FastAPI、网页或 Docker |
+| 完成门 | 20 条和 ID 固定；成功/越权参考 SQL 路由与结果一致；非执行类别合同明确；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | `main` 已包含 PR #4 merge commit `c85fdb5` |
-| 阻碍 | 无工程阻碍；PR #4 已合并，merge commit 的远端 CI 已通过 |
+| 项目基线 | Draft PR #5：`codex/eval-dataset` → `main@887f20f` |
+| 阻碍 | 无工程阻碍；PR #5 等待评审，implementation SHA `33653d2` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -77,6 +77,25 @@
   [main CI run 30688678078](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30688678078)
   在该 SHA 上完成，结论为 `success`。
 
+## EVAL-DATASET-008 验证证据
+
+- `evals/cases.jsonl` 恰好 20 条，固定 ID 与分类为成功 8、歧义 3、无答案 3、越权 3、注入 3；
+  ID 和问题均唯一。
+- 严格 JSONL 校验拒绝空行、未知字段、重复 ID、非法 `NaN`、类别数量漂移和 gold 字段漂移；
+  成功与越权必须带参考 SQL，其余类别禁止预写 SQL。
+- 8 条成功参考 SQL 经现有工作流复算：7 条直接完成，1 条 `LIMIT 11` 安全查询先挂起、批准后
+  完成；列、行和截断状态全部与 gold 一致。
+- 3 条越权参考 SQL 均先挂起且 `can_execute=false`，模拟批准后仍以
+  `approval_cannot_override_read_only` 结束，执行尝试为 0，不产生 evidence 或 answer。
+- 11 条参考案例复算前后业务数据库 SHA-256 不变；合同测试已进入现有 `api/tests` CI 入口。
+- Python `3.13.12` 全量产品与合同测试 33 项通过；`compileall`、`pip check`、差异与公开内容
+  检查通过。
+- 当前数据集不是模型运行结果，尚无执行成功率、答案正确率或人工介入率。完整合同见
+  [`docs/work/eval-dataset.md`](work/eval-dataset.md)。
+- [Draft PR #5](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/5) 已创建；
+  [CI run 30690243508](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30690243508)
+  在 implementation SHA `33653d2` 上完成，结论为 `success`。
+
 ## APPROVAL-GATE-004 验证证据
 
 - SQLite `EXPLAIN QUERY PLAN` 与现有 authorizer 组成不执行结果计划的机械校验；写操作和
@@ -103,8 +122,8 @@
 
 ## 下一候选
 
-下一切片候选是冻结 20 条合成评测合同：先固定问题、期望 SQL/结果、风险类别与机器校验规则，
-不调用 Provider、不计算模型指标，为后续真实 NL2SQL 接入提供稳定验收基线。
+下一步候选是 DeepSeek 最小 Provider 探针：仅在 Git 忽略目录验证凭据、兼容接口、结构化 SQL
+输出与少量固定案例，不修改产品代码。该动作会产生外部调用和费用，必须另获当次授权。
 
 ## 审批中断/恢复最小风险探针
 

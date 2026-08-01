@@ -1,5 +1,6 @@
 """Auditable NL2SQL product package."""
 
+from .answer import ANSWER_SCHEMA_VERSION, AnswerCompositionError, compose_answer
 from .database import (
     ColumnSchema,
     ForeignKeySchema,
@@ -35,6 +36,9 @@ from .workflow import (
 )
 
 __all__ = [
+    "ANSWER_SCHEMA_VERSION",
+    "AnswerCompositionError",
+    "compose_answer",
     "ColumnSchema",
     "ForeignKeySchema",
     "QueryExecutionError",

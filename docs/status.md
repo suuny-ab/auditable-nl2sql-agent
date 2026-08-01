@@ -4,16 +4,16 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `ready` |
+| `state` | `review_pending` |
 | 更新时间 | `2026-08-01` |
-| 最近完成 | `RESULT-EVIDENCE-006`：结果失败关闭校验、版本化 evidence、跨进程指纹重算 |
-| 前序能力 | `APPROVAL-GATE-004`：机械 SQL 审批分类、真实中断恢复、决定幂等与不可绕过只读边界 |
-| 做什么 | SQL 结果通过结构与截断校验后，与问题、SQL、schema 和校验回执绑定为稳定 evidence |
-| 不做什么 | 未接 LLM、业务语义判断、自然语言回答、FastAPI、网页、Docker、Postgres 或完整评测 |
-| 完成门 | 正常及审批成功产证据；跨进程可重算；截断、拒绝、写操作与执行错误均不产证据；业务库不变 |
+| 最近完成 | `EVIDENCE-ANSWER-007`：由完整 evidence 生成带精确来源的确定性 `answer-v1` |
+| 前序能力 | `RESULT-EVIDENCE-006`：结果失败关闭校验、版本化 evidence、跨进程指纹重算 |
+| 做什么 | evidence 验证通过后生成保守回答，绑定指纹和精确结果路径，并持久化到 run record |
+| 不做什么 | 未接 LLM、业务语义判断或生成、FastAPI、网页、Docker、Postgres 或完整评测 |
+| 完成门 | 单值/零行/多行回答可回查；指纹不匹配、合同异常和失败路径无回答；跨进程一致；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | `main` 已包含 PR #3 merge commit `9f2b652` |
-| 阻碍 | 无工程阻碍；PR #3 已合并，merge commit 的远端 CI 已通过 |
+| 项目基线 | Draft PR #4：`codex/evidence-answer` → `main@038fb2d` |
+| 阻碍 | 无工程阻碍；PR #4 等待评审，implementation SHA `0824ac8` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -60,6 +60,23 @@
   [main CI run 30687356777](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30687356777)
   在该 SHA 上完成，结论为 `success`。
 
+## EVIDENCE-ANSWER-007 验证证据
+
+- 成功路径固定增加 `compose_answer`：单值结果生成精确单元格引用，多行结果只陈述行数与字段，
+  零行结果明确表示未返回数据。
+- 回答前同时校验 evidence 指纹与完整绑定合同；指纹篡改、以及重新计算指纹但加入合同外字段的
+  evidence 均失败关闭。
+- 回答异常形成 `failed/evidence_verification_failed` 并停在 `compose_answer`；有效 evidence
+  保留，answer 为 `null`。审批拒绝、写操作、错误 SQL、未知问题、缺失 schema 和截断路径也
+  不产生 answer。
+- 第二个真实 Python 进程按 run ID 回查的 answer 与原记录完全一致，且不重新执行图节点。
+- Python `3.13.12` 全量产品测试 30 项通过；成功、回答失败和原安全失败路径继续验证业务库
+  SHA-256 不变；`compileall`、`pip check`、差异与公开内容检查通过。完整合同见
+  [`docs/work/evidence-answer.md`](work/evidence-answer.md)。
+- [Draft PR #4](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/4) 已创建；
+  [CI run 30688221877](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30688221877)
+  在 implementation SHA `0824ac8` 上完成，结论为 `success`。
+
 ## APPROVAL-GATE-004 验证证据
 
 - SQLite `EXPLAIN QUERY PLAN` 与现有 authorizer 组成不执行结果计划的机械校验；写操作和
@@ -86,8 +103,8 @@
 
 ## 下一候选
 
-下一切片候选是最小证据回答：只根据已绑定的 evidence 生成确定性回答投影，让工作流具备
-“回答”终态。仍不接真实 LLM、FastAPI、网页或完整评测，也不把格式化回答当成业务语义正确。
+下一切片候选是冻结 20 条合成评测合同：先固定问题、期望 SQL/结果、风险类别与机器校验规则，
+不调用 Provider、不计算模型指标，为后续真实 NL2SQL 接入提供稳定验收基线。
 
 ## 审批中断/恢复最小风险探针
 

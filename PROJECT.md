@@ -51,8 +51,8 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
   evidence。
 - 成功结果绑定 run ID、问题、SQL、schema 快照、结果与校验回执，形成版本化
   `evidence-v1`；规范 JSON 的 SHA-256 可在独立进程重算验证。
-- 离线工作流核心和审批门已分别由 PR #1、PR #2 合并到 `main`；当前 `main@d7be385` 的
-  20 个测试与远端 CI 通过。
+- 离线工作流核心、审批门和结果证据已分别由 PR #1、PR #2、PR #3 合并到 `main`；结果证据
+  merge commit `9f2b652` 的 25 个测试与远端 CI 通过。
 
 真实模型生成、业务语义校验、自然语言回答、真实身份权限、FastAPI、网页、评测集和 Docker
 仍待实现。当前 evidence 指纹不是数字签名，也不证明 SQL 的业务语义正确。

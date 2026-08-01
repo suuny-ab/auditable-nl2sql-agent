@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `review_pending` |
+| `state` | `ready` |
 | 更新时间 | `2026-08-01` |
 | 最近完成 | `RESULT-EVIDENCE-006`：结果失败关闭校验、版本化 evidence、跨进程指纹重算 |
 | 前序能力 | `APPROVAL-GATE-004`：机械 SQL 审批分类、真实中断恢复、决定幂等与不可绕过只读边界 |
@@ -12,8 +12,8 @@
 | 不做什么 | 未接 LLM、业务语义判断、自然语言回答、FastAPI、网页、Docker、Postgres 或完整评测 |
 | 完成门 | 正常及审批成功产证据；跨进程可重算；截断、拒绝、写操作与执行错误均不产证据；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | Draft PR #3：`codex/result-evidence` → `main@d7be385` |
-| 阻碍 | 无工程阻碍；PR #3 等待评审，implementation SHA `150af40` 的远端 CI 已通过 |
+| 项目基线 | `main` 已包含 PR #3 merge commit `9f2b652` |
+| 阻碍 | 无工程阻碍；PR #3 已合并，merge commit 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -56,9 +56,9 @@
 - Python `3.13.12` 全量产品测试 25 项通过，`compileall`、`pip check` 与 `git diff --check`
   通过；成功、执行失败、写操作拒绝与截断路径均校验业务数据库哈希不变。
 - 完整合同与声明边界见 [`docs/work/result-evidence.md`](work/result-evidence.md)。
-  [Draft PR #3](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/3) 已创建；
-  [CI run 30687228936](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30687228936)
-  在 implementation SHA `150af40` 上完成，结论为 `success`。
+  [PR #3](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/3) 已合并为 `9f2b652`；
+  [main CI run 30687356777](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30687356777)
+  在该 SHA 上完成，结论为 `success`。
 
 ## APPROVAL-GATE-004 验证证据
 

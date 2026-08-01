@@ -123,6 +123,7 @@ class ProviderContractTests(unittest.TestCase):
 
         result = generator.generate(CANONICAL_QUESTION, _schema())
 
+        self.assertEqual(result.action, "query")
         self.assertEqual(result.sql, CANONICAL_SQL)
         self.assertEqual(
             result.receipt,
@@ -149,6 +150,7 @@ class ProviderContractTests(unittest.TestCase):
         self.assertEqual(request["temperature"], 0)
         self.assertFalse(request["stream"])
         self.assertIn("JSON", request["messages"][0]["content"])
+        self.assertIn("unsafe_operation", request["messages"][0]["content"])
         self.assertIn(CANONICAL_QUESTION, request["messages"][1]["content"])
         self.assertNotIn("DEEPSEEK_API_KEY", json.dumps(request))
 
@@ -200,6 +202,9 @@ class ProviderContractTests(unittest.TestCase):
 
         block_with_sql = _response(action="block", sql="DELETE FROM orders")
         invalid_responses["block with SQL"] = block_with_sql
+
+        unsafe_without_sql = _response(action="unsafe_operation", sql=None)
+        invalid_responses["unsafe operation without SQL"] = unsafe_without_sql
 
         invalid_usage = _response()
         invalid_usage["usage"]["prompt_tokens"] = True
@@ -291,14 +296,51 @@ class ProviderWorkflowTests(unittest.TestCase):
         )
         self.assertEqual(_sha256(self.business_database), before)
 
+    def test_provider_decisions_have_stable_zero_execution_terminals(self) -> None:
+        before = _sha256(self.business_database)
+        cases = {
+            "blocked": ("block", "blocked", "provider_blocked"),
+            "clarification": (
+                "clarify",
+                "clarification_required",
+                "provider_clarification_required",
+            ),
+            "no-answer": ("no_answer", "no_answer", "provider_no_answer"),
+        }
+        for name, (action, expected_status, expected_code) in cases.items():
+            with self.subTest(action=action):
+                with self._runner(
+                    _response(action=action, sql=None),
+                    checkpoint_name=f"decision-{name}.sqlite3",
+                ) as runner:
+                    record = runner.run(
+                        run_id=f"provider-decision-{name}",
+                        question=CANONICAL_QUESTION,
+                    )
+
+                self.assertEqual(record["schema_version"], "run-record-v5")
+                self.assertEqual(record["status"], expected_status)
+                self.assertEqual(record["provider_action"], action)
+                self.assertEqual(record["error_code"], expected_code)
+                self.assertEqual(record["attempt_count"], 0)
+                self.assertIsNone(record["generated_sql"])
+                self.assertIsNone(record["approval"])
+                self.assertIsNone(record["evidence"])
+                self.assertIsNone(record["answer"])
+                self.assertEqual(
+                    [event["node"] for event in record["trajectory"]],
+                    ["load_schema", "draft_sql"],
+                )
+                self.assertEqual(record["trajectory"][-1]["status"], expected_status)
+                self.assertEqual(
+                    record["trajectory"][-1]["details"]["provider"]["action"],
+                    action,
+                )
+                self.assertEqual(_sha256(self.business_database), before)
+
     def test_provider_failures_stop_before_sql_execution(self) -> None:
         before = _sha256(self.business_database)
         cases = {
-            "blocked": (
-                _response(action="block", sql=None),
-                None,
-                "provider_blocked",
-            ),
             "malformed": ({"model": "deepseek-v4-flash"}, None, "provider_response_error"),
             "transport": (None, TimeoutError("private detail"), "provider_transport_error"),
         }
@@ -326,6 +368,42 @@ class ProviderWorkflowTests(unittest.TestCase):
                 )
                 self.assertEqual(_sha256(self.business_database), before)
 
+    def test_unsafe_operation_action_forces_non_executable_approval(self) -> None:
+        before = _sha256(self.business_database)
+        unsafe_decision = _response(
+            action="unsafe_operation",
+            sql=CANONICAL_SQL,
+            reason="The user requested a write operation; preserve SQL for audit only",
+        )
+        with self._runner(
+            unsafe_decision,
+            checkpoint_name="unsafe-operation.sqlite3",
+        ) as runner:
+            pending = runner.run(
+                run_id="provider-unsafe-operation",
+                question="删除所有已取消订单。",
+            )
+            record = runner.decide(
+                run_id="provider-unsafe-operation",
+                decision_id="approve-provider-unsafe-operation",
+                approved=True,
+            )
+
+        self.assertEqual(pending["schema_version"], "run-record-v5")
+        self.assertEqual(pending["status"], "pending_approval")
+        self.assertEqual(pending["provider_action"], "unsafe_operation")
+        self.assertEqual(pending["generated_sql"], CANONICAL_SQL)
+        self.assertEqual(pending["approval"]["reason"], "unsafe_operation")
+        self.assertFalse(pending["approval"]["can_execute"])
+        self.assertEqual(pending["attempt_count"], 0)
+        self.assertEqual(record["status"], "failed")
+        self.assertEqual(record["provider_action"], "unsafe_operation")
+        self.assertEqual(record["error_code"], "approval_cannot_override_read_only")
+        self.assertEqual(record["attempt_count"], 0)
+        self.assertIsNone(record["evidence"])
+        self.assertIsNone(record["answer"])
+        self.assertEqual(_sha256(self.business_database), before)
+
     def test_provider_cannot_label_delete_sql_into_execution(self) -> None:
         before = _sha256(self.business_database)
         dangerous = _response(
@@ -345,6 +423,8 @@ class ProviderWorkflowTests(unittest.TestCase):
             )
 
         self.assertEqual(pending["status"], "pending_approval")
+        self.assertEqual(pending["provider_action"], "query")
+        self.assertEqual(pending["approval"]["reason"], "read_only_violation")
         self.assertFalse(pending["approval"]["can_execute"])
         self.assertEqual(pending["attempt_count"], 0)
         self.assertEqual(record["status"], "failed")

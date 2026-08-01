@@ -61,8 +61,15 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
 - 正式 `DeepSeekSqlGenerator` 默认禁用，显式启用后读取环境凭据；严格校验 JSON plan 与 usage，
   并把脱敏 Provider 回执写入 trajectory。真实收入查询已完成 evidence/answer，真实删除请求在
   `draft_sql` 阶段阻断且执行次数为 0；仍未产生 20 条评测指标。
-- 离线工作流核心、审批门、结果证据、确定性回答、固定评测合同和 Provider 探针已分别由
-  PR #1 至 PR #6 合并到 `main`；探针 merge commit `604ccf4` 的 33 个测试与远端 CI 通过。
+- 候选五类 Provider action 的最小探针中，歧义、无答案、越权删除和提示词注入 4 条真实调用
+  分别得到 `clarify`、`no_answer`、`unsafe_operation`、`block`；所有执行次数为 0，业务库不变。
+  该探针本身只排除了分类可分性的最小风险，不代表正式决策终态合同或模型评测指标已经实现。
+- 正式 Provider plan 已支持五类 action；`run-record-v5` 直接投影 `provider_action`，并把
+  `clarify`、`no_answer`、`block` 持久化为独立零执行终态。`unsafe_operation` 携带审计 SQL，
+  但 action 本身固定进入 `can_execute=false` 的审批；人工批准仍不能触发执行。
+- 离线工作流核心、审批门、结果证据、确定性回答、固定评测合同、Provider 探针和正式 Provider
+  adapter 已分别由 PR #1 至 PR #7 合并到 `main`；PR #7 merge commit `ee4758b` 的 41 项测试与
+  远端 CI 通过。
 
 业务语义评测、真实身份权限、FastAPI、网页、模型评测运行与指标、Docker
 仍待实现。当前 answer 是确定性结果投影；evidence 指纹不是数字签名，也不证明 SQL 的业务

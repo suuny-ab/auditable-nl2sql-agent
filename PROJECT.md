@@ -53,24 +53,27 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
   `evidence-v1`；规范 JSON 的 SHA-256 可在独立进程重算验证。
 - 通过完整 evidence 合同校验后生成 `answer-v1`：单行结果精确引用结果单元格，零行和多行
   只生成 evidence 直接支持的保守摘要；回答与 trajectory 可按 run ID 跨进程回查。
-- 已冻结 20 条合成评测合同，按成功、歧义、无答案、越权、注入分为 `8/3/3/3/3`；成功与
-  越权参考 SQL 可由现有工作流复算，但尚未运行真实模型或产生指标。
+- 已冻结 20 条合成评测合同，按成功、歧义、无答案、越权、注入分为 `8/3/3/3/3`；离线运行器
+  保存逐案例 trajectory、脱敏 usage、数据集/业务库哈希、判定理由和三个固定指标。
 - DeepSeek 最小探针使用 `deepseek-v4-flash` 对 2 条成功问题和 1 条删除请求得到严格 JSON；
   加入稳定输出列合同后，两条只读 SQL 的结果命中 gold，删除请求在模型层阻断且执行次数为 0。
   这只证明当前凭据、接口和最小安全路由可行，不是正式 Provider 或模型评测能力。
 - 正式 `DeepSeekSqlGenerator` 默认禁用，显式启用后读取环境凭据；严格校验 JSON plan 与 usage，
   并把脱敏 Provider 回执写入 trajectory。真实收入查询已完成 evidence/answer，真实删除请求在
-  `draft_sql` 阶段阻断且执行次数为 0；仍未产生 20 条评测指标。
+  `draft_sql` 阶段阻断且执行次数为 0。
 - 候选五类 Provider action 的最小探针中，歧义、无答案、越权删除和提示词注入 4 条真实调用
   分别得到 `clarify`、`no_answer`、`unsafe_operation`、`block`；所有执行次数为 0，业务库不变。
   该探针本身只排除了分类可分性的最小风险，不代表正式决策终态合同或模型评测指标已经实现。
 - 正式 Provider plan 已支持五类 action；`run-record-v5` 直接投影 `provider_action`，并把
   `clarify`、`no_answer`、`block` 持久化为独立零执行终态。`unsafe_operation` 携带审计 SQL，
   但 action 本身固定进入 `can_execute=false` 的审批；人工批准仍不能触发执行。
+- 首次真实固定基线对 20 条案例各调用 DeepSeek 一次且自动重试为 0：执行成功率 `7/8`、答案
+  正确率 `14/20`、人工介入率 `7/20`，合计 `19231` tokens。3 条越权案例执行次数均为 0，业务库
+  整轮前后及逐案例哈希不变；两条非成功类别因语义误判执行了只读 SQL，已作为真实误差保留。
 - 离线工作流核心、审批门、结果证据、确定性回答、固定评测合同、Provider 探针和正式 Provider
-  adapter 已分别由 PR #1 至 PR #7 合并到 `main`；PR #7 merge commit `ee4758b` 的 41 项测试与
-  远端 CI 通过。
+  adapter 已分别由 PR #1 至 PR #8 合并到 `main`；PR #8 merge commit `0e960289` 的远端 CI
+  通过。模型评测运行器和首次基线回执目前只在本地 `codex/model-eval-runner` 分支，尚未推送。
 
-业务语义评测、真实身份权限、FastAPI、网页、模型评测运行与指标、Docker
-仍待实现。当前 answer 是确定性结果投影；evidence 指纹不是数字签名，也不证明 SQL 的业务
-语义正确。
+独立未见集评测、真实身份权限、FastAPI、网页和 Docker 仍待实现。当前 answer 是确定性结果
+投影；evidence 指纹不是数字签名，也不证明 SQL 的业务语义正确。首次 20 条基线只代表该冻结
+合成集上的单次结果，不代表生产可靠性。

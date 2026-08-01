@@ -20,4 +20,6 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
   --output <report.json>
 ```
 
-真实模型指标只有在固定 20 条完整运行后才能落盘和公开。
+首次固定 20 条 DeepSeek 基线已完成：执行成功率 `7/8`、答案正确率 `14/20`、人工介入率
+`7/20`，20 次调用合计 `19231` tokens，自动重试为 `0`。这是单次冻结合成集结果，不代表生产
+可靠性；完整判定与安全回执见 [`docs/work/model-eval-runner.md`](../docs/work/model-eval-runner.md)。

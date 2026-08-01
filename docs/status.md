@@ -4,16 +4,16 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `awaiting_authorization` |
+| `state` | `ready` |
 | 更新时间 | `2026-08-01` |
-| 当前切片 | `MODEL-EVAL-RUNNER-013`：20 条单次运行、结构化报告与三个固定指标 |
+| 当前切片 | `MODEL-EVAL-RUNNER-013`：已完成 20 条单次真实基线、结构化报告与三个固定指标 |
 | 最近完成 | `PROVIDER-DECISION-CONTRACT-012`：五类严格 action、稳定终态与越权审批路由 |
-| 做什么 | 实现离线评测器、固定审批策略、逐案例 trajectory/usage 与三个指标 |
+| 做什么 | 冻结 20 条各调用一次；保存逐案例 trajectory/usage；计算并核验三个指标 |
 | 不做什么 | 不改产品合同或 prompt，不做 API/网页/Docker，不重试或重复刷分，不新增依赖 |
-| 完成门 | 本地已满足：确定性 20 条与错误捕获、45 项测试通过；剩余真实 20 条与 usage 回执 |
-| 风险 | 报告已分开初始挂起与模拟审批；真实调用固定每条一次、无自动重试，仍需当轮授权 |
-| 项目基线 | 本地堆叠 `codex/model-eval-runner`；切片起点 `72c866a`，前置 Draft PR #8 尚未合并 |
-| 阻碍 | 等待用户明确授权：合并 PR #8，并使用环境凭据发起固定 20 次 DeepSeek 调用 |
+| 完成门 | 已满足：20/20 回执、三项指标、越权执行 0、逐案例业务库哈希不变、自动重试 0 |
+| 风险 | 首次基线答案正确率为 `14/20`；2 条非成功类别被误路由并执行只读 SQL，需保留为真实误差 |
+| 项目基线 | `main@0e960289`；本地 `codex/model-eval-runner@4e1e1be` 加本轮结果回执 |
+| 阻碍 | 无工程阻碍；当前评测分支尚未推送，推送与创建 PR 需要新的当轮授权 |
 
 ## 复用审查
 
@@ -139,11 +139,11 @@
 - Python `3.13.12` Provider 定向 10 项、全量 43 项测试通过；编译、依赖、差异、凭据模式、
   `.local` 跟踪和产品依赖方向检查通过。本轮真实 Provider 调用与 token 消耗均为 0。完整合同见
   [`docs/work/provider-decision-contract.md`](work/provider-decision-contract.md)。
-- [Draft PR #8](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/8) 已创建；
-  [CI run 30693992922](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30693992922)
-  在 publication head `e103dc5` 上完成，结论为 `success`。
+- [PR #8](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/8) 已合并为 `0e960289`；
+  [main CI run 30695247832](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30695247832)
+  在该 merge commit 上完成，结论为 `success`。
 
-## MODEL-EVAL-RUNNER-013 本地验证证据
+## MODEL-EVAL-RUNNER-013 验证证据
 
 - 版本化 `model-evaluation-report-v1` 已实现：逐案例保存初始状态、模拟审批、最终 run record、完整
   trajectory、脱敏 usage、数据集/业务库哈希、判定理由和三个指标；报告与 checkpoint 均拒绝覆盖。
@@ -152,8 +152,14 @@
 - 一条故意错误的注入查询使答案正确率精确降为 `19/20`，并记录一次非成功路径 SQL 执行，证明
   评测器不会把可执行但语义错误的模型输出计为正确。
 - Python `3.13.12` 新增 2 项评测器测试、全量 45 项测试通过；编译、依赖、差异、凭据模式、
-  `.local` 跟踪和产品依赖方向检查通过。当前没有真实 DeepSeek 调用或模型指标。
-- 完整指标口径、模拟审批边界与剩余授权门见
+  `.local` 跟踪和产品依赖方向检查通过。
+- 首次真实固定基线 `baseline-20260801T101307Z` 对 20 条冻结案例各调用一次，自动重试为 `0`；
+  执行成功率 `7/8`、答案正确率 `14/20`、人工介入率 `7/20`。
+- 20 条均有脱敏 usage：prompt `17664`、completion `1567`、total `19231` tokens。3 条越权案例
+  执行次数均为 0，越权执行总数为 0；业务库整轮前后及逐案例哈希全部不变。
+- 误差包括 1 条成功问题被判为无答案、3 条成功问题发生非预期审批，以及歧义/无答案各 1 条被
+  错误路由为只读查询。结果按首次单次运行保留，没有调参、补跑或重复刷分。
+- 完整指标口径、模拟审批边界与真实回执见
   [`docs/work/model-eval-runner.md`](work/model-eval-runner.md)。
 
 
@@ -202,9 +208,9 @@
 
 ## 当前检查点
 
-本地评测运行器与指标计算已经通过；当前切片只剩一次真实 20 条运行。开始前必须取得当轮授权，
-先合并前置 PR #8，再显式启用 Provider；每条固定一次且不自动重试。真实指标落盘前不进入下一
-产品切片，也不做 prompt 调优或重复刷分。
+评测运行器与首次真实 20 条固定基线均已完成；本地结果分支尚未推送。下一步先在新的当轮授权下
+推送并创建 PR，保留 `7/8`、`14/20`、`7/20` 原始基线，不做 prompt 调优或补跑。合并后再决定
+是否进入 FastAPI 的只读任务/轨迹查询最小切片。
 
 ## 审批中断/恢复最小风险探针
 

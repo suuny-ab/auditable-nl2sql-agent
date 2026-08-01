@@ -26,7 +26,7 @@
 - 不做大规模提示词优化，不新增业务 schema、工具或第三方依赖。
 - 不改变 SQLite 机械只读边界，不让模型 action 或人工批准覆盖 authorizer。
 - 不在代码中实现预算、余额、费用告警或自动停用逻辑。
-- 本切片只本地提交；推送、PR 和公开发布另获当次授权。
+- 不合并 PR，不把 Draft PR 转为 Ready；外部发布只到用户当次授权的切片分支和 Draft PR。
 
 ## 怎样算完成
 
@@ -72,3 +72,6 @@
 - Python `3.13.12` 全量产品与合同测试 41 项通过；`compileall`、`pip check`、
   `git diff --check`、tracked secret pattern scan、`.local` 未跟踪检查和产品不反向导入 `evals`
   检查通过。
+- [Draft PR #7](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/7) 已创建；
+  [CI run 30692232491](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30692232491)
+  在 implementation SHA `120a458` 上完成，结论为 `success`。

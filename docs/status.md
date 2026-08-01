@@ -12,8 +12,8 @@
 | 不做什么 | 不跑 20 条评测或指标，不做 API/网页/Docker，不新增依赖或代码层费用限制 |
 | 完成门 | 默认禁用；成功闭环；模型/响应/网络失败零执行；危险 SQL 仍不可批准执行；业务库不变 |
 | 风险 | 本轮已授权使用环境变量中的 DeepSeek key；凭据和原始 HTTP 数据不得输出、持久化或提交 |
-| 项目基线 | `main@604ccf4`：PR #6 已合并且 merge commit CI 通过 |
-| 阻碍 | 无工程阻碍；本切片仅本地，尚未获推送授权 |
+| 项目基线 | Draft PR #7：`codex/deepseek-sql-generator` → `main@604ccf4` |
+| 阻碍 | 无工程阻碍；PR #7 等待评审，implementation SHA `120a458` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -112,6 +112,9 @@
 - Python `3.13.12` 全量产品与合同测试 41 项通过；`compileall`、`pip check`、
   `git diff --check`、tracked secret pattern scan、`.local` 未跟踪检查和产品不反向导入 `evals`
   检查通过。
+- [Draft PR #7](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/7) 已创建；
+  [CI run 30692232491](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30692232491)
+  在 implementation SHA `120a458` 上完成，结论为 `success`。
 
 
 ## EVAL-DATASET-008 验证证据

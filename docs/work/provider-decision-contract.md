@@ -66,3 +66,6 @@
   `pip check`、`git diff --check`、tracked secret pattern scan、`.local` 未跟踪检查和产品不反向导入
   `evals` 检查通过。
 - 本轮使用 fake transport，真实 Provider 调用次数和 token 消耗均为 0；未新增依赖、工具或费用逻辑。
+- [Draft PR #8](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/8) 已创建；
+  [CI run 30693992922](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30693992922)
+  在 publication head `e103dc5` 上完成，结论为 `success`。

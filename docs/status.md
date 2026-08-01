@@ -12,8 +12,8 @@
 | 不做什么 | 不调用真实 Provider，不跑 20 条评测或指标，不做 API/网页/Docker，不新增依赖 |
 | 完成门 | 已满足：五类严格 plan；三类稳定零执行终态；越权审批不可执行；43 项测试通过 |
 | 风险 | `run-record-v5` 已版本化决策字段；模型 action 与 SQLite 机械只读边界均有独立回归测试 |
-| 项目基线 | 本地 `codex/provider-decision-contract`；切片起点 `852dca7`，基于已合并 PR #7 head 并含决策探针 |
-| 阻碍 | 无工程阻碍；PR #7 已合并且 main CI 通过，决策探针与当前合同仍仅在本地分支 |
+| 项目基线 | Draft PR #8：`codex/provider-decision-contract` → `main@ee4758b` |
+| 阻碍 | 无工程阻碍；PR #8 等待评审，publication head `e103dc5` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -139,6 +139,9 @@
 - Python `3.13.12` Provider 定向 10 项、全量 43 项测试通过；编译、依赖、差异、凭据模式、
   `.local` 跟踪和产品依赖方向检查通过。本轮真实 Provider 调用与 token 消耗均为 0。完整合同见
   [`docs/work/provider-decision-contract.md`](work/provider-decision-contract.md)。
+- [Draft PR #8](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/8) 已创建；
+  [CI run 30693992922](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30693992922)
+  在 publication head `e103dc5` 上完成，结论为 `success`。
 
 
 ## EVAL-DATASET-008 验证证据

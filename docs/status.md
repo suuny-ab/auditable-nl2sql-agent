@@ -12,8 +12,8 @@
 | 不做什么 | 未接 LLM、真实身份权限、自动重试、FastAPI、网页、Docker、Postgres 或完整评测 |
 | 完成门 | 普通查询直通；高行数批准只执行一次；拒绝和写操作批准不执行；重复决定显式失败；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | 本地分支 `codex/approval-gate` 基于已合并并通过 CI 的 `origin/main@63381f9` |
-| 阻碍 | 无工程阻碍；审批门候选尚未获得推送授权，新的远端 CI 尚未运行 |
+| 项目基线 | 本地与远端分支 `codex/approval-gate` 基于已合并并通过 CI 的 `origin/main@63381f9` |
+| 阻碍 | 无工程阻碍；Draft PR #2 已打开且 CI 通过，尚未授权合并 |
 
 ## 复用审查
 
@@ -51,7 +51,9 @@
 - 写 SQL 的审批状态固定 `can_execute=false`；即使批准也以
   `approval_cannot_override_read_only` 结束，执行尝试为 0，业务库哈希不变。
 - 当前全量测试为 20 项本地通过；完整合同见
-  [`docs/work/approval-gate.md`](work/approval-gate.md)。候选尚未推送，远端 CI 结论不存在。
+  [`docs/work/approval-gate.md`](work/approval-gate.md)。候选已进入
+  [Draft PR #2](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/2)，当前 HEAD 的远端 CI
+  结论为 `success`，PR 未获得合并授权。
 
 ## 下一候选
 

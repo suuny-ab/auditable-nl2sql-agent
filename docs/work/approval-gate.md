@@ -59,4 +59,5 @@
   `failed/approval_cannot_override_read_only`、执行尝试 `0`，未到达执行节点。
 - 普通单行聚合和 `LIMIT 5` 直接完成；无字面量上限的多行查询保守进入审批。
 - 数据库与工作流定向测试及依赖合同共 20 项通过；业务库哈希比较、严格 JSON 投影和第二进程
-  恢复测试通过。远端 CI 尚未运行，不能把本地结果写成远端结论。
+  恢复测试通过。[Draft PR #2](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/2)
+  当前 HEAD 的远端 CI 结论为 `success`，PR 未获得合并授权。

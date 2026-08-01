@@ -5,14 +5,15 @@
 | 字段 | 内容 |
 | --- | --- |
 | `state` | `ready` |
-| 更新时间 | `2026-07-31` |
+| 更新时间 | `2026-08-01` |
 | 最近完成 | `WORKFLOW-CORE-002`：离线 LangGraph 状态机、独立 checkpoint、稳定 trajectory 与失败终态 |
+| 最近验证 | `APPROVAL-INTERRUPT-PROBE-003`：跨进程挂起、批准、拒绝与重复恢复边界 |
 | 前序能力 | `READONLY-SQL-001`：合成 SQLite 数据、schema 读取、只读 SQL 执行 |
 | 做什么 | 用确定性 SQL stub 串联 schema 与只读执行；持久化 run/checkpoint/trajectory，并记录成功或失败终态 |
 | 不做什么 | 未接 LLM、审批恢复、自动重试、FastAPI、网页、Docker、Postgres 或完整评测 |
 | 完成门 | 锁定依赖干净安装；成功、失败、写操作拒绝、未知问题、缺失 schema、重复 run 与独立进程回查均通过测试；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | 本地分支 `codex/offline-workflow-core` 基于 `7f7ab5c`；公开 `origin/main` 仍为 `429b440` |
+| 项目基线 | 本地分支 `codex/offline-workflow-core` 包含离线工作流候选与审批探针记录；公开 `origin/main` 仍为 `429b440` |
 | 阻碍 | 无工程阻碍；本切片尚未获得推送授权，更新后的 GitHub Actions 尚未远端运行 |
 
 ## 复用审查
@@ -41,9 +42,23 @@
 
 ## 下一候选
 
-下一切片候选是审批门与真正的中断/恢复：高危 SQL 在执行前持久化挂起，批准或拒绝后使用
-同一 run ID 恢复，并验证重复决定和进程重启边界。真实 LLM、FastAPI、评测、网页与 Docker
-继续后置。
+下一切片候选是正式审批门：高行数只读 SQL 在执行前持久化挂起，批准或拒绝后使用同一
+run ID 恢复；产品 runner 必须显式拒绝已终结 run 的重复决定。写操作和越权查询不能因
+人工批准绕过机械只读边界。真实 LLM、FastAPI、评测、网页与 Docker 继续后置。
+
+## 审批中断/恢复最小风险探针
+
+2026-08-01 在 Git 忽略目录完成，正式产品代码和依赖未变化：
+
+- 进程 A 将高行数只读查询持久化为 `pending_approval` 并退出；进程 B 用同一 run ID 和
+  `Command(resume=...)` 恢复为 `completed`，返回 11 行且独立执行账本恰好为 `1`。
+- 第三个进程重复提交相同决定时没有重复执行，但 LangGraph 是静默 no-op，不会主动拒绝；
+  正式 runner 因此需要显式终态检查和决定幂等合同。
+- 独立拒绝 run 得到 `rejected`，执行计数为 `0`；批准和拒绝终态均无待处理任务。
+- 最终 8 项机器断言全部通过，业务库 SHA-256 始终为
+  `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`。
+- 完整合同与失败修正记录见
+  [`docs/work/approval-interrupt-probe.md`](work/approval-interrupt-probe.md)。
 
 ## WORKFLOW-CORE-002 验证证据
 

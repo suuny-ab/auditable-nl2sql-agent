@@ -12,8 +12,8 @@
 | 不做什么 | 不改产品合同或 prompt，不做 API/网页/Docker，不重试或重复刷分，不新增依赖 |
 | 完成门 | 已满足：20/20 回执、三项指标、越权执行 0、逐案例业务库哈希不变、自动重试 0 |
 | 风险 | 首次基线答案正确率为 `14/20`；2 条非成功类别被误路由并执行只读 SQL，需保留为真实误差 |
-| 项目基线 | `main@0e960289`；本地 `codex/model-eval-runner@4e1e1be` 加本轮结果回执 |
-| 阻碍 | 无工程阻碍；当前评测分支尚未推送，推送与创建 PR 需要新的当轮授权 |
+| 项目基线 | Draft PR #9：`codex/model-eval-runner` → `main@0e960289`；implementation head `91aaa20` |
+| 阻碍 | 无工程阻碍；Draft PR #9 等待评审，本轮不转 Ready、不合并 |
 
 ## 复用审查
 
@@ -161,6 +161,9 @@
   错误路由为只读查询。结果按首次单次运行保留，没有调参、补跑或重复刷分。
 - 完整指标口径、模拟审批边界与真实回执见
   [`docs/work/model-eval-runner.md`](work/model-eval-runner.md)。
+- [Draft PR #9](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/9) 已创建；
+  [CI run 30695678436](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30695678436)
+  在 implementation head `91aaa20` 上完成，结论为 `success`。
 
 
 ## EVAL-DATASET-008 验证证据
@@ -208,8 +211,8 @@
 
 ## 当前检查点
 
-评测运行器与首次真实 20 条固定基线均已完成；本地结果分支尚未推送。下一步先在新的当轮授权下
-推送并创建 PR，保留 `7/8`、`14/20`、`7/20` 原始基线，不做 prompt 调优或补跑。合并后再决定
+评测运行器与首次真实 20 条固定基线均已完成并发布为 Draft PR #9；保留
+`7/8`、`14/20`、`7/20` 原始基线，不做 prompt 调优或补跑。下一步是评审与合并；合并后再决定
 是否进入 FastAPI 的只读任务/轨迹查询最小切片。
 
 ## 审批中断/恢复最小风险探针

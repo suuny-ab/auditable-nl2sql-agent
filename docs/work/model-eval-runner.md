@@ -38,7 +38,7 @@
 - 不修改 Provider 决策合同、正式 prompt、工作流安全边界或冻结问题文本。
 - 不做 API、网页、Docker、并发、自动重试、阈值调参或重复运行刷分。
 - 不新增第三方依赖、工具、业务表或代码层费用控制。
-- 不推送当前评测分支；推送与创建 PR 仍留待新的当轮授权。
+- 不在发布动作中转 Ready 或合并 PR #9；这些外部动作仍需新的当轮授权。
 
 ## 怎样算完成
 
@@ -86,3 +86,6 @@
 - 报告位于 Git 忽略目录
   `.local/model-eval-runner/runs/20260801T101307Z/report.json`；未保存 key、Authorization header、
   原始 HTTP 数据或隐藏思维。本基线没有调参、补跑或重复刷分。
+- [Draft PR #9](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/9) 已创建；
+  [CI run 30695678436](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30695678436)
+  在 implementation head `91aaa20` 上完成，结论为 `success`。

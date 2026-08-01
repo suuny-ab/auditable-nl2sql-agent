@@ -56,6 +56,7 @@
 - Python `3.13.12`：`python -m unittest discover -s api/tests -p "test_*.py" -v` 得到
   `Ran 30 tests`、`OK`；成功和回答失败路径均验证业务数据库 SHA-256 不变。
 - `compileall`、`pip check`、`git diff --check` 和变更文件公开内容扫描通过。
-- 本切片未增加依赖、未调用 Provider。[Draft PR #4](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/4)
-  已创建；[CI run 30688221877](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30688221877)
-  在 implementation SHA `0824ac8` 上完成，结论为 `success`。
+- 本切片未增加依赖、未调用 Provider。[PR #4](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/4)
+  已合并为 `c85fdb5`；
+  [main CI run 30688678078](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30688678078)
+  在该 SHA 上完成，结论为 `success`。

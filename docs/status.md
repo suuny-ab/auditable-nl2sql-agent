@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `review_pending` |
+| `state` | `ready` |
 | 更新时间 | `2026-08-01` |
 | 最近完成 | `EVIDENCE-ANSWER-007`：由完整 evidence 生成带精确来源的确定性 `answer-v1` |
 | 前序能力 | `RESULT-EVIDENCE-006`：结果失败关闭校验、版本化 evidence、跨进程指纹重算 |
@@ -12,8 +12,8 @@
 | 不做什么 | 未接 LLM、业务语义判断或生成、FastAPI、网页、Docker、Postgres 或完整评测 |
 | 完成门 | 单值/零行/多行回答可回查；指纹不匹配、合同异常和失败路径无回答；跨进程一致；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | Draft PR #4：`codex/evidence-answer` → `main@038fb2d` |
-| 阻碍 | 无工程阻碍；PR #4 等待评审，implementation SHA `0824ac8` 的远端 CI 已通过 |
+| 项目基线 | `main` 已包含 PR #4 merge commit `c85fdb5` |
+| 阻碍 | 无工程阻碍；PR #4 已合并，merge commit 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -73,9 +73,9 @@
 - Python `3.13.12` 全量产品测试 30 项通过；成功、回答失败和原安全失败路径继续验证业务库
   SHA-256 不变；`compileall`、`pip check`、差异与公开内容检查通过。完整合同见
   [`docs/work/evidence-answer.md`](work/evidence-answer.md)。
-- [Draft PR #4](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/4) 已创建；
-  [CI run 30688221877](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30688221877)
-  在 implementation SHA `0824ac8` 上完成，结论为 `success`。
+- [PR #4](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/4) 已合并为 `c85fdb5`；
+  [main CI run 30688678078](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30688678078)
+  在该 SHA 上完成，结论为 `success`。
 
 ## APPROVAL-GATE-004 验证证据
 

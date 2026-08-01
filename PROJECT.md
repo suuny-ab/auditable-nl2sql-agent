@@ -4,7 +4,7 @@
 >
 > 状态：`mvp_development`
 >
-> 最后核实：`2026-07-31`
+> 最后核实：`2026-08-01`
 
 ## 产品目的
 
@@ -41,11 +41,13 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
   本地执行时间；写入、DDL、`ATTACH` 和 `PRAGMA` 失败关闭。
 - 首切片 8 个测试已在本地和首次 GitHub Actions 中通过；这只证明 SQLite 事实层，不是完整
   NL2SQL 或 Agent 能力。
-- 确定性 LangGraph 工作流已串联 schema、SQL stub 和只读执行，成功、无效 SQL、写操作拒绝、
-  未支持问题及缺失 schema 都形成持久化终态。
+- 确定性 LangGraph 工作流已串联 schema、SQL stub、审批门和只读执行；成功、无效 SQL、
+  审批拒绝、写操作拒绝、未支持问题及缺失 schema 都形成持久化终态。
 - LangGraph checkpoint 写入独立 workflow SQLite；项目自有 JSON trajectory 随状态保存，
   第二个独立 Python 进程可按 run ID 回查而不重新执行节点。
-- Python 3.13 的锁定依赖干净安装、16 个本地测试和 Draft PR #1 的远端 CI 已通过；这只证明
-  确定性离线工作流候选，不证明真实 NL2SQL 或审批闭环。
+- 高行数只读 SQL 和机械只读校验拒绝的 SQL 会在执行前进入 `pending_approval`；另一进程可用
+  同一 run ID 批准或拒绝。已终结 run 的重复决定显式失败，批准不能让写 SQL 到达执行节点。
+- 离线工作流核心已由 PR #1 合并到 `main`，合并 SHA `63381f9` 的 CI 通过；审批门候选已进入
+  Draft PR #2，20 个本地测试和 PR 当前 HEAD 的远端 CI 通过，但尚未合并。
 
-真实模型生成、结果校验、证据绑定、审批中断/恢复、FastAPI、网页、评测集和 Docker 仍待实现。
+真实模型生成、结果语义校验、证据绑定、真实身份权限、FastAPI、网页、评测集和 Docker 仍待实现。

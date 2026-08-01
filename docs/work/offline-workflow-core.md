@@ -60,6 +60,6 @@
 - 第二个独立 Python 进程通过公开状态 API 读回完全相同的 run record，generator 未执行。
 - 序列化器显式 `pickle_fallback=False`、`allowed_msgpack_modules=[]`；run record 可严格 JSON
   编码。编译、空白和公开内容扫描通过。
-- [Draft PR #1](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/1) 当前 HEAD 的 Python 3.13
-  远端 CI 已通过。
+- [PR #1](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/1) 已合并为 `63381f9`；该 SHA
+  的 Python 3.13 `main` CI 已通过。
 - 未验证：正式产品内的中断恢复与人工决定、真实 LLM、FastAPI、Docker 或评测指标。

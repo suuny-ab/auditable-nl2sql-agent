@@ -6,15 +6,14 @@
 | --- | --- |
 | `state` | `ready` |
 | 更新时间 | `2026-08-01` |
-| 最近完成 | `WORKFLOW-CORE-002`：离线 LangGraph 状态机、独立 checkpoint、稳定 trajectory 与失败终态 |
-| 最近验证 | `APPROVAL-INTERRUPT-PROBE-003`：跨进程挂起、批准、拒绝与重复恢复边界 |
-| 前序能力 | `READONLY-SQL-001`：合成 SQLite 数据、schema 读取、只读 SQL 执行 |
-| 做什么 | 用确定性 SQL stub 串联 schema 与只读执行；持久化 run/checkpoint/trajectory，并记录成功或失败终态 |
-| 不做什么 | 未接 LLM、审批恢复、自动重试、FastAPI、网页、Docker、Postgres 或完整评测 |
-| 完成门 | 锁定依赖干净安装；成功、失败、写操作拒绝、未知问题、缺失 schema、重复 run 与独立进程回查均通过测试；业务库不变 |
+| 最近完成 | `APPROVAL-GATE-004`：机械 SQL 审批分类、真实中断恢复、决定幂等与不可绕过只读边界 |
+| 前序能力 | `WORKFLOW-CORE-002`：离线 LangGraph 状态机、独立 checkpoint、稳定 trajectory 与失败终态 |
+| 做什么 | 高行数和写操作 SQL 在执行前持久化挂起；同一 run ID 可跨进程批准或拒绝 |
+| 不做什么 | 未接 LLM、真实身份权限、自动重试、FastAPI、网页、Docker、Postgres 或完整评测 |
+| 完成门 | 普通查询直通；高行数批准只执行一次；拒绝和写操作批准不执行；重复决定显式失败；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | 本地与远端分支 `codex/offline-workflow-core` 包含离线工作流候选与审批探针记录；公开 `origin/main` 仍为 `429b440` |
-| 阻碍 | 无工程阻碍；Draft PR #1 已打开且 CI 通过，尚未授权合并 |
+| 项目基线 | 本地与远端分支 `codex/approval-gate` 基于已合并并通过 CI 的 `origin/main@63381f9` |
+| 阻碍 | 无工程阻碍；Draft PR #2 已打开且 CI 通过，尚未授权合并 |
 
 ## 复用审查
 
@@ -39,14 +38,27 @@
 - 首次公开推送 SHA `429b44007e7848317fcccd3199a168ff97fc8075`；GitHub Actions
   [run 30628166219](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30628166219)
   在该 SHA 上完成，结论为 `success`。
-- 离线工作流候选已进入 [Draft PR #1](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/1)；
-  PR 当前 HEAD 的 Python 3.13 CI 结论为 `success`，PR 未获得合并授权。
+- [PR #1](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/1) 已合并为 `63381f9`；
+  [main CI run 30684609206](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30684609206)
+  在该 SHA 上完成，结论为 `success`。
+
+## APPROVAL-GATE-004 验证证据
+
+- SQLite `EXPLAIN QUERY PLAN` 与现有 authorizer 组成不执行结果计划的机械校验；写操作和
+  `PRAGMA` 被拒绝，字符串策略只用于保守行数分类，不承担只读安全边界。
+- `LIMIT 6` 在阈值 5 下挂起，第二个真实 Python 进程批准后只执行一次；拒绝、非法决定、
+  缺失 run 和终态重复决定均失败关闭。
+- 写 SQL 的审批状态固定 `can_execute=false`；即使批准也以
+  `approval_cannot_override_read_only` 结束，执行尝试为 0，业务库哈希不变。
+- 当前全量测试为 20 项本地通过；完整合同见
+  [`docs/work/approval-gate.md`](work/approval-gate.md)。候选已进入
+  [Draft PR #2](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/2)，当前 HEAD 的远端 CI
+  结论为 `success`，PR 未获得合并授权。
 
 ## 下一候选
 
-下一切片候选是正式审批门：高行数只读 SQL 在执行前持久化挂起，批准或拒绝后使用同一
-run ID 恢复；产品 runner 必须显式拒绝已终结 run 的重复决定。写操作和越权查询不能因
-人工批准绕过机械只读边界。真实 LLM、FastAPI、评测、网页与 Docker 继续后置。
+下一切片候选是结果校验与证据绑定：把 SQL、schema 快照、结果行和校验结论绑定为稳定证据
+对象，但仍不接真实 LLM、FastAPI、网页或完整评测。
 
 ## 审批中断/恢复最小风险探针
 
@@ -75,8 +87,8 @@ run ID 恢复；产品 runner 必须显式拒绝已终结 run 的重复决定。
 - 独立第二 Python 进程使用会抛错的 generator 构造 runner，仍能只读回原 run，证明
   `get_run` 不会重新执行节点；这只证明持久化回查，不证明中断恢复。
 - 成功、执行错误和写操作拒绝测试均比较业务库 SHA-256；workflow 表只存在于独立状态库。
-- `compileall`、空白检查、公开内容扫描通过。CI 使用 Python 3.13 从 hash 锁安装；
-  Draft PR #1 当前 HEAD 的远端 CI 已通过。
+- `compileall`、空白检查、公开内容扫描通过。PR #1 已合并，`main@63381f9` 的 Python 3.13
+  远端 CI 已通过。
 
 ## LangGraph 最小风险探针
 

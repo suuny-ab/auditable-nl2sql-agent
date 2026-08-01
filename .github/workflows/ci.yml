@@ -35,5 +35,5 @@ jobs:
           --require-hashes --requirement api/requirements-base.lock
       - name: Compile product package
         run: python -m compileall -q api/src
-      - name: Run read-only database tests
+      - name: Run product tests
         run: python -m unittest discover -s api/tests -p "test_*.py" -v

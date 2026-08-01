@@ -180,6 +180,49 @@ def read_schema(database_path: str | Path) -> tuple[TableSchema, ...]:
         return tuple(tables)
 
 
+def validate_read_only_statement(
+    database_path: str | Path,
+    sql: str,
+    *,
+    timeout_seconds: float = 2.0,
+) -> None:
+    """Validate one SQL statement without executing its result-producing plan."""
+
+    if not sql.strip():
+        raise ValueError("SQL must not be empty")
+    if timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be positive")
+
+    deadline = time.monotonic() + timeout_seconds
+    with closing(_connect_read_only(Path(database_path))) as connection:
+        connection.set_authorizer(_deny_mutations)
+        connection.set_progress_handler(
+            lambda: int(time.monotonic() >= deadline),
+            1_000,
+        )
+        try:
+            connection.execute(f"EXPLAIN QUERY PLAN {sql}").fetchall()
+        except sqlite3.DatabaseError as exc:
+            message = str(exc).lower()
+            if "interrupted" in message:
+                raise QueryTimeoutError(
+                    "SQL validation exceeded its execution deadline"
+                ) from exc
+            if (
+                "not authorized" in message
+                or "readonly" in message
+                or "query only" in message
+            ):
+                raise ReadOnlyViolation(
+                    "SQL violates the read-only validation contract"
+                ) from exc
+            raise QueryExecutionError(
+                f"SQLite could not validate the query: {exc}"
+            ) from exc
+        finally:
+            connection.set_progress_handler(None, 0)
+
+
 def execute_read_only(
     database_path: str | Path,
     sql: str,

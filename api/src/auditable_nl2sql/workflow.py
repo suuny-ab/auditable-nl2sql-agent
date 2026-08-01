@@ -14,6 +14,7 @@ from typing import Annotated, Any, Protocol, TypedDict
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
 
 from .database import (
     QueryExecutionError,
@@ -21,6 +22,7 @@ from .database import (
     ReadOnlyViolation,
     execute_read_only,
     read_schema,
+    validate_read_only_statement,
 )
 
 
@@ -33,7 +35,8 @@ CANONICAL_SQL = (
     "AND sales_order.order_date >= '2026-01-01' "
     "AND sales_order.order_date < '2026-04-01'"
 )
-RUN_RECORD_SCHEMA_VERSION = "run-record-v1"
+RUN_RECORD_SCHEMA_VERSION = "run-record-v2"
+DEFAULT_APPROVAL_ROW_LIMIT = 5
 
 
 class DuplicateRunError(ValueError):
@@ -42,6 +45,10 @@ class DuplicateRunError(ValueError):
 
 class RunNotFoundError(LookupError):
     """Raised when a requested run ID has no persisted checkpoint."""
+
+
+class InvalidApprovalDecisionError(ValueError):
+    """Raised when a decision cannot be applied to a pending run."""
 
 
 class UnsupportedQuestionError(ValueError):
@@ -90,10 +97,30 @@ class WorkflowState(TypedDict, total=False):
     error_code: str | None
     error_message: str | None
     attempt_count: int
+    approval_required: bool
+    approval_reason: str | None
+    approval_threshold: int | None
+    approval_requested_row_limit: int | None
+    approval_can_execute: bool
+    approval_decision: str | None
+    approval_decision_id: str | None
     trajectory: Annotated[list[TrajectoryEvent], operator.add]
 
 
 _RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\Z")
+_DECISION_ID_PATTERN = _RUN_ID_PATTERN
+_SIMPLE_LIMIT_PATTERN = re.compile(
+    r"\bLIMIT\s+(\d+)(?:\s+OFFSET\s+\d+)?\s*;?\s*\Z",
+    re.IGNORECASE,
+)
+_SINGLE_ROW_AGGREGATE_PATTERN = re.compile(
+    r"\b(?:COUNT|SUM|AVG|MIN|MAX)\s*\(",
+    re.IGNORECASE,
+)
+_MULTI_ROW_AGGREGATE_PATTERN = re.compile(
+    r"\b(?:GROUP\s+BY|UNION|INTERSECT|EXCEPT)\b",
+    re.IGNORECASE,
+)
 
 
 def _event(
@@ -172,10 +199,55 @@ def _json_scalar(value: Any) -> str | int | float | bool | None:
     raise UnsupportedResultType(f"unsupported SQLite result type: {type(value).__name__}")
 
 
+def _approval_requirement(
+    *,
+    business_database: Path,
+    sql: str,
+    row_limit: int,
+) -> dict[str, Any] | None:
+    try:
+        validate_read_only_statement(business_database, sql)
+    except ReadOnlyViolation:
+        return {
+            "reason": "read_only_violation",
+            "threshold": row_limit,
+            "requested_row_limit": None,
+            "can_execute": False,
+        }
+    except QueryExecutionError:
+        # Preserve the execution node as the single source of persisted query errors.
+        return None
+
+    limit_match = _SIMPLE_LIMIT_PATTERN.search(sql)
+    if limit_match is not None:
+        requested_row_limit = int(limit_match.group(1))
+        if requested_row_limit <= row_limit:
+            return None
+        return {
+            "reason": "row_limit_exceeded",
+            "threshold": row_limit,
+            "requested_row_limit": requested_row_limit,
+            "can_execute": True,
+        }
+
+    if _SINGLE_ROW_AGGREGATE_PATTERN.search(sql) and not (
+        _MULTI_ROW_AGGREGATE_PATTERN.search(sql)
+    ):
+        return None
+
+    return {
+        "reason": "row_limit_unbounded",
+        "threshold": row_limit,
+        "requested_row_limit": None,
+        "can_execute": True,
+    }
+
+
 def _build_graph(
     *,
     business_database: Path,
     generator: SqlGenerator,
+    approval_row_limit: int,
     checkpointer: SqliteSaver,
 ):
     def load_schema(state: WorkflowState) -> dict[str, Any]:
@@ -234,6 +306,131 @@ def _build_graph(
                     node="draft_sql",
                     status="completed",
                     details={"sql": sql},
+                )
+            ],
+        }
+
+    def assess_sql(state: WorkflowState) -> dict[str, Any]:
+        requirement = _approval_requirement(
+            business_database=business_database,
+            sql=state["generated_sql"],
+            row_limit=approval_row_limit,
+        )
+        if requirement is None:
+            return {
+                "approval_required": False,
+                "approval_reason": None,
+                "approval_threshold": approval_row_limit,
+                "approval_requested_row_limit": None,
+                "approval_can_execute": True,
+                "approval_decision": None,
+                "approval_decision_id": None,
+                "status": "execution_ready",
+                "trajectory": [
+                    _event(
+                        state,
+                        node="assess_sql",
+                        status="completed",
+                        details={"approval_required": False},
+                    )
+                ],
+            }
+        return {
+            "approval_required": True,
+            "approval_reason": requirement["reason"],
+            "approval_threshold": requirement["threshold"],
+            "approval_requested_row_limit": requirement["requested_row_limit"],
+            "approval_can_execute": requirement["can_execute"],
+            "approval_decision": None,
+            "approval_decision_id": None,
+            "status": "pending_approval",
+            "trajectory": [
+                _event(
+                    state,
+                    node="assess_sql",
+                    status="pending",
+                    details={
+                        "reason": requirement["reason"],
+                        "threshold": requirement["threshold"],
+                        "requested_row_limit": requirement["requested_row_limit"],
+                        "can_execute": requirement["can_execute"],
+                    },
+                )
+            ],
+        }
+
+    def approval_gate(state: WorkflowState) -> dict[str, Any]:
+        decision = interrupt(
+            {
+                "kind": "approval_required",
+                "run_id": state["run_id"],
+                "sql": state["generated_sql"],
+                "reason": state["approval_reason"],
+                "threshold": state["approval_threshold"],
+                "requested_row_limit": state["approval_requested_row_limit"],
+                "can_execute": state["approval_can_execute"],
+            }
+        )
+        approved = decision["approved"]
+        decision_id = decision["decision_id"]
+        decision_name = "approved" if approved else "rejected"
+
+        if not approved:
+            return {
+                "approval_decision": decision_name,
+                "approval_decision_id": decision_id,
+                "status": "rejected",
+                "error_code": "approval_rejected",
+                "error_message": "query was rejected by human approval",
+                "trajectory": [
+                    _event(
+                        state,
+                        node="approval_gate",
+                        status="rejected",
+                        details={
+                            "decision": decision_name,
+                            "decision_id": decision_id,
+                        },
+                    )
+                ],
+            }
+
+        if not state["approval_can_execute"]:
+            return {
+                "approval_decision": decision_name,
+                "approval_decision_id": decision_id,
+                "status": "failed",
+                "error_code": "approval_cannot_override_read_only",
+                "error_message": "approval cannot override the read-only SQL boundary",
+                "trajectory": [
+                    _event(
+                        state,
+                        node="approval_gate",
+                        status="failed",
+                        details={
+                            "decision": decision_name,
+                            "decision_id": decision_id,
+                            "error_code": "approval_cannot_override_read_only",
+                        },
+                    )
+                ],
+            }
+
+        return {
+            "approval_decision": decision_name,
+            "approval_decision_id": decision_id,
+            "status": "approval_granted",
+            "error_code": None,
+            "error_message": None,
+            "trajectory": [
+                _event(
+                    state,
+                    node="approval_gate",
+                    status="approved",
+                    details={
+                        "decision": decision_name,
+                        "decision_id": decision_id,
+                    },
                 )
             ],
         }
@@ -316,7 +513,15 @@ def _build_graph(
         return "stop" if state["status"] == "failed" else "draft_sql"
 
     def after_draft(state: WorkflowState) -> str:
-        return "stop" if state["status"] == "failed" else "execute_sql"
+        return "stop" if state["status"] == "failed" else "assess_sql"
+
+    def after_assessment(state: WorkflowState) -> str:
+        if state["status"] == "pending_approval":
+            return "approval_gate"
+        return "execute_sql"
+
+    def after_approval(state: WorkflowState) -> str:
+        return "execute_sql" if state["status"] == "approval_granted" else "stop"
 
     def after_execute(state: WorkflowState) -> str:
         return "stop" if state["status"] == "failed" else "finish"
@@ -324,6 +529,8 @@ def _build_graph(
     builder = StateGraph(WorkflowState)
     builder.add_node("load_schema", load_schema)
     builder.add_node("draft_sql", draft_sql)
+    builder.add_node("assess_sql", assess_sql)
+    builder.add_node("approval_gate", approval_gate)
     builder.add_node("execute_sql", execute_sql)
     builder.add_node("finish", finish)
     builder.add_edge(START, "load_schema")
@@ -331,7 +538,17 @@ def _build_graph(
         "load_schema", after_schema, {"stop": END, "draft_sql": "draft_sql"}
     )
     builder.add_conditional_edges(
-        "draft_sql", after_draft, {"stop": END, "execute_sql": "execute_sql"}
+        "draft_sql", after_draft, {"stop": END, "assess_sql": "assess_sql"}
+    )
+    builder.add_conditional_edges(
+        "assess_sql",
+        after_assessment,
+        {"approval_gate": "approval_gate", "execute_sql": "execute_sql"},
+    )
+    builder.add_conditional_edges(
+        "approval_gate",
+        after_approval,
+        {"stop": END, "execute_sql": "execute_sql"},
     )
     builder.add_conditional_edges(
         "execute_sql", after_execute, {"stop": END, "finish": "finish"}
@@ -349,7 +566,10 @@ class WorkflowRunner:
         checkpoint_database: str | Path,
         *,
         generator: SqlGenerator | None = None,
+        approval_row_limit: int = DEFAULT_APPROVAL_ROW_LIMIT,
     ) -> None:
+        if type(approval_row_limit) is not int or approval_row_limit <= 0:
+            raise ValueError("approval_row_limit must be a positive integer")
         self._business_database = Path(business_database).resolve()
         self._checkpoint_database = Path(checkpoint_database).resolve()
         if self._business_database == self._checkpoint_database:
@@ -367,6 +587,7 @@ class WorkflowRunner:
             self._graph = _build_graph(
                 business_database=self._business_database,
                 generator=generator or StaticSqlGenerator(),
+                approval_row_limit=approval_row_limit,
                 checkpointer=SqliteSaver(self._connection, serde=serializer),
             )
         except Exception:
@@ -412,6 +633,42 @@ class WorkflowRunner:
         )
         return self.get_run(normalized_run_id)
 
+    def decide(
+        self,
+        *,
+        run_id: str,
+        decision_id: str,
+        approved: bool,
+    ) -> dict[str, Any]:
+        self._ensure_open()
+        normalized_run_id = self._validate_run_id(run_id)
+        normalized_decision_id = self._validate_decision_id(decision_id)
+        if type(approved) is not bool:
+            raise InvalidApprovalDecisionError("approved must be a boolean")
+
+        config = self._config(normalized_run_id)
+        snapshot = self._graph.get_state(config)
+        if not snapshot.values:
+            raise RunNotFoundError(f"run ID was not found: {normalized_run_id}")
+        if (
+            snapshot.values.get("status") != "pending_approval"
+            or tuple(snapshot.next) != ("approval_gate",)
+        ):
+            raise InvalidApprovalDecisionError(
+                f"run is not awaiting approval: {normalized_run_id}"
+            )
+
+        self._graph.invoke(
+            Command(
+                resume={
+                    "approved": approved,
+                    "decision_id": normalized_decision_id,
+                }
+            ),
+            config,
+        )
+        return self.get_run(normalized_run_id)
+
     def get_run(self, run_id: str) -> dict[str, Any]:
         self._ensure_open()
         normalized_run_id = self._validate_run_id(run_id)
@@ -436,11 +693,34 @@ class WorkflowRunner:
         return normalized
 
     @staticmethod
+    def _validate_decision_id(decision_id: str) -> str:
+        if not isinstance(decision_id, str):
+            raise InvalidApprovalDecisionError("decision_id must be a string")
+        normalized = decision_id.strip()
+        if not _DECISION_ID_PATTERN.fullmatch(normalized):
+            raise InvalidApprovalDecisionError(
+                "decision_id must be 1-64 characters using letters, digits, dot, "
+                "underscore, or hyphen"
+            )
+        return normalized
+
+    @staticmethod
     def _config(run_id: str) -> dict[str, dict[str, str]]:
         return {"configurable": {"thread_id": run_id}}
 
     @staticmethod
     def _project(state: Mapping[str, Any], *, checkpoint_count: int) -> dict[str, Any]:
+        approval = None
+        if state.get("approval_required"):
+            approval = {
+                "required": True,
+                "reason": state.get("approval_reason"),
+                "threshold": state.get("approval_threshold"),
+                "requested_row_limit": state.get("approval_requested_row_limit"),
+                "can_execute": state.get("approval_can_execute"),
+                "decision": state.get("approval_decision"),
+                "decision_id": state.get("approval_decision_id"),
+            }
         record = {
             "schema_version": RUN_RECORD_SCHEMA_VERSION,
             "run_id": state["run_id"],
@@ -454,6 +734,7 @@ class WorkflowRunner:
             "attempt_count": state.get("attempt_count", 0),
             "error_code": state.get("error_code"),
             "error_message": state.get("error_message"),
+            "approval": approval,
             "trajectory": state.get("trajectory", []),
             "checkpoint_count": checkpoint_count,
         }

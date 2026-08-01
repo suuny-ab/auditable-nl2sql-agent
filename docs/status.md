@@ -13,8 +13,8 @@
 | 不做什么 | 未接 LLM、审批恢复、自动重试、FastAPI、网页、Docker、Postgres 或完整评测 |
 | 完成门 | 锁定依赖干净安装；成功、失败、写操作拒绝、未知问题、缺失 schema、重复 run 与独立进程回查均通过测试；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | 本地分支 `codex/offline-workflow-core` 包含离线工作流候选与审批探针记录；公开 `origin/main` 仍为 `429b440` |
-| 阻碍 | 无工程阻碍；本切片尚未获得推送授权，更新后的 GitHub Actions 尚未远端运行 |
+| 项目基线 | 本地与远端分支 `codex/offline-workflow-core` 包含离线工作流候选与审批探针记录；公开 `origin/main` 仍为 `429b440` |
+| 阻碍 | 无工程阻碍；Draft PR #1 已打开且 CI 通过，尚未授权合并 |
 
 ## 复用审查
 
@@ -39,6 +39,8 @@
 - 首次公开推送 SHA `429b44007e7848317fcccd3199a168ff97fc8075`；GitHub Actions
   [run 30628166219](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30628166219)
   在该 SHA 上完成，结论为 `success`。
+- 离线工作流候选已进入 [Draft PR #1](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/1)；
+  PR 当前 HEAD 的 Python 3.13 CI 结论为 `success`，PR 未获得合并授权。
 
 ## 下一候选
 
@@ -73,8 +75,8 @@ run ID 恢复；产品 runner 必须显式拒绝已终结 run 的重复决定。
 - 独立第二 Python 进程使用会抛错的 generator 构造 runner，仍能只读回原 run，证明
   `get_run` 不会重新执行节点；这只证明持久化回查，不证明中断恢复。
 - 成功、执行错误和写操作拒绝测试均比较业务库 SHA-256；workflow 表只存在于独立状态库。
-- `compileall`、空白检查、公开内容扫描通过。CI 已改为 Python 3.13 从 hash 锁安装，但该
-  候选尚未推送，不能声称新的远端 CI 已通过。
+- `compileall`、空白检查、公开内容扫描通过。CI 使用 Python 3.13 从 hash 锁安装；
+  Draft PR #1 当前 HEAD 的远端 CI 已通过。
 
 ## LangGraph 最小风险探针
 

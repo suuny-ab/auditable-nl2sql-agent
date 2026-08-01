@@ -45,6 +45,7 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
   未支持问题及缺失 schema 都形成持久化终态。
 - LangGraph checkpoint 写入独立 workflow SQLite；项目自有 JSON trajectory 随状态保存，
   第二个独立 Python 进程可按 run ID 回查而不重新执行节点。
-- Python 3.13 的锁定依赖干净安装和 16 个本地测试已通过；新的 CI 候选尚未推送和远端运行。
+- Python 3.13 的锁定依赖干净安装、16 个本地测试和 Draft PR #1 的远端 CI 已通过；这只证明
+  确定性离线工作流候选，不证明真实 NL2SQL 或审批闭环。
 
 真实模型生成、结果校验、证据绑定、审批中断/恢复、FastAPI、网页、评测集和 Docker 仍待实现。

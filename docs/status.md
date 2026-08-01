@@ -6,14 +6,14 @@
 | --- | --- |
 | `state` | `ready` |
 | 更新时间 | `2026-08-01` |
-| 最近完成 | `DEEPSEEK-PROVIDER-PROBE-009`：3 条固定案例的 JSON SQL 输出与安全路由探针通过 |
-| 前序能力 | `EVAL-DATASET-008`：冻结 20 条 `8/3/3/3/3` 合成 gold contract 并复算参考 SQL |
-| 做什么 | 调用 3 条固定案例；严格解析 JSON；SQL 只经现有工作流；记录 usage 与数据库哈希 |
-| 不做什么 | 不改正式 Provider/工作流/依赖，不跑 20 条评测，不计算指标，不加入代码层费用限制 |
-| 完成门 | 3 次接口与 JSON 通过；2 条成功结果命中 gold；越权不执行；畸形响应拒绝；业务库不变 |
-| 风险 | 6 次 DeepSeek 调用回执仅在 `.local/`；凭据未输出或落盘；正式 Provider 仍默认关闭 |
-| 项目基线 | Draft PR #6：`codex/deepseek-provider-probe` → `main@0f19712` |
-| 阻碍 | 无工程阻碍；PR #6 等待评审，implementation SHA `aca0759` 的远端 CI 已通过 |
+| 最近完成 | `DEEPSEEK-SQL-GENERATOR-010`：正式 Provider adapter、脱敏回执与失败关闭接入 |
+| 前序能力 | `DEEPSEEK-PROVIDER-PROBE-009`：3 条固定案例的 JSON SQL 输出与安全路由探针通过 |
+| 做什么 | 实现 transport、严格 plan、脱敏回执及工作流接入；完成 2 条真实固定冒烟 |
+| 不做什么 | 不跑 20 条评测或指标，不做 API/网页/Docker，不新增依赖或代码层费用限制 |
+| 完成门 | 默认禁用；成功闭环；模型/响应/网络失败零执行；危险 SQL 仍不可批准执行；业务库不变 |
+| 风险 | 本轮已授权使用环境变量中的 DeepSeek key；凭据和原始 HTTP 数据不得输出、持久化或提交 |
+| 项目基线 | Draft PR #7：`codex/deepseek-sql-generator` → `main@604ccf4` |
+| 阻碍 | 无工程阻碍；PR #7 等待评审，implementation SHA `120a458` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -90,9 +90,32 @@
 - Python `3.13.12` 全量产品与合同测试 33 项通过；`compileall`、`pip check`、
   `git diff --check` 和 tracked secret pattern scan 通过。完整合同见
   [`docs/work/deepseek-provider-probe.md`](work/deepseek-provider-probe.md)。
-- [Draft PR #6](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/6) 已创建；
-  [CI run 30691303286](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30691303286)
-  在 implementation SHA `aca0759` 上完成，结论为 `success`。
+- [PR #6](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/6) 已合并为 `604ccf4`；
+  [main CI run 30691601003](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30691601003)
+  在该 SHA 上完成，结论为 `success`。
+
+## DEEPSEEK-SQL-GENERATOR-010 验证证据
+
+- `DeepSeekSqlGenerator` 默认禁用；只有 `from_environment(enabled=true)` 才读取
+  `DEEPSEEK_API_KEY`。正式 HTTP transport 固定官方 HTTPS endpoint，无新增依赖或自动重试。
+- 严格校验单一 choice、`finish_reason=stop`、usage 和精确 `action/sql/reason`；成功与模型决定
+  均把 `provider-receipt-v1` 写入 `draft_sql` trajectory，不保存 key、header、原始包或隐藏思维。
+- fake transport 覆盖 query、block/clarify/no_answer、畸形 envelope/JSON/usage、网络异常；这些
+  失败路径执行次数为 0，不产生 approval、evidence 或 answer。
+- Provider 即使把 `DELETE` 错标为 query，现有审批门仍给出 `can_execute=false`；模拟批准后以
+  `approval_cannot_override_read_only` 结束，执行次数为 0，业务库哈希不变。
+- 两条真实固定冒烟无重试：收入查询完成并得到 `5946.0`、可验证 evidence 与 `answer-v1`；删除
+  请求以 `provider_blocked` 停在 `draft_sql`，执行次数为 0。prompt `1674`、completion `141`、
+  total `1815` tokens。
+- 真实冒烟前后业务 SQLite SHA-256 均为
+  `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`；脱敏回执只在 Git 忽略目录。
+- Python `3.13.12` 全量产品与合同测试 41 项通过；`compileall`、`pip check`、
+  `git diff --check`、tracked secret pattern scan、`.local` 未跟踪检查和产品不反向导入 `evals`
+  检查通过。
+- [Draft PR #7](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/7) 已创建；
+  [CI run 30692232491](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30692232491)
+  在 implementation SHA `120a458` 上完成，结论为 `success`。
+
 
 ## EVAL-DATASET-008 验证证据
 
@@ -139,10 +162,9 @@
 
 ## 下一候选
 
-下一步候选是正式 DeepSeek SQL generator 的最小产品切片：只增加一个默认禁用的 Provider
-适配器、严格结构化解析和失败关闭测试，接入现有 `WorkflowRunner`；不跑 20 条评测、不计算
-指标、不做 FastAPI 或网页。探针已经排除当前凭据、接口、JSON 输出、稳定列名合同和机械安全
-路由的最小风险。
+下一步候选是 Provider 决策终态合同：把 `clarify`、`no_answer`、`block` 从统一失败码映射为可供
+评测器直接判定的稳定终态，同时保持零 SQL 执行；不调用完整 20 条评测、不计算指标。完成后再做
+模型评测运行器，避免评测层反向解释产品内部错误。
 
 ## 审批中断/恢复最小风险探针
 

@@ -2,17 +2,17 @@
 
 [![CI](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/workflows/ci.yml)
 
-一个只使用合成数据的可审计 NL2SQL 作品集项目。当前已具备确定性离线 LangGraph 工作流：
-固定问题经过 schema 读取、SQL stub、机械只读执行，形成独立 SQLite checkpoint 和可按 run ID
-回查的 JSON trajectory。执行结果通过结构和截断校验后，会与问题、SQL、schema 快照及校验
-回执绑定为可重算 SHA-256 指纹的 `evidence-v1`，再生成只陈述证据直接支持内容并带精确来源
-引用的 `answer-v1`。高行数和写操作查询会在执行前持久化挂起，可使用同一 run ID 在另一进程
-批准或拒绝；批准仍不能绕过机械只读边界。
+一个只使用合成数据的可审计 NL2SQL 作品集项目。当前 LangGraph 工作流可在确定性 SQL stub 与
+默认禁用的 DeepSeek SQL generator 之间注入选择：问题经过 schema 读取、SQL 生成和机械只读
+执行，形成独立 SQLite checkpoint 与可按 run ID 回查的 JSON trajectory。Provider 模型、action、
+结束原因和 token usage 以脱敏回执写入同一 trajectory；执行结果再与问题、SQL、schema 快照及
+校验回执绑定为可重算 SHA-256 指纹的 `evidence-v1`，并生成只陈述证据直接支持内容的
+`answer-v1`。高行数和写操作查询会在执行前持久化挂起，人工批准仍不能绕过机械只读边界。
 
-当前 SQL stub 只是可重复的工作流替身，不构成真实 NL2SQL 能力或正确率主张。真实模型、
-业务语义生成、API、网页、模型评测运行和 Docker 仍待实现。当前回答是确定性结果投影，不是
-LLM 回答；已经冻结的 20 条合成评测合同不是模型运行结果。SHA-256 用于稳定绑定和变化检测，
-不是数字签名，也不证明 SQL 或答案的业务语义正确。
+DeepSeek adapter 已通过一条真实收入查询和一条删除请求的最小冒烟，但尚未运行 20 条模型评测，
+不构成正确率或生产稳定性主张。默认工作流仍使用可重复的 SQL stub；API、网页、模型评测运行和
+Docker 仍待实现。当前回答是确定性结果投影，不是 LLM 自由回答；SHA-256 用于稳定绑定和变化
+检测，不是数字签名，也不证明 SQL 或答案的业务语义正确。
 
 ## 当前目录
 

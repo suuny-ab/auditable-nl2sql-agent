@@ -57,5 +57,7 @@
 - 11 条参考案例复算前后业务数据库 SHA-256 完全相同。
 - Python `3.13.12`：`python -m unittest discover -s api/tests -p "test_*.py" -v` 得到
   `Ran 33 tests`、`OK`；`compileall`、`pip check`、`git diff --check` 和变更文件公开内容扫描通过。
-- 本切片未调用 Provider、未计算任何指标、未增加依赖、未推送远端；因此没有本提交的远端
-  CI 结论。
+- 本切片未调用 Provider、未计算任何指标、未增加依赖。
+  [Draft PR #5](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/5) 已创建；
+  [CI run 30690243508](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30690243508)
+  在 implementation SHA `33653d2` 上完成，结论为 `success`。

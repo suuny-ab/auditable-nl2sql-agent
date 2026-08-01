@@ -4,7 +4,7 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `ready` |
+| `state` | `review_pending` |
 | 更新时间 | `2026-08-01` |
 | 最近完成 | `EVAL-DATASET-008`：冻结 20 条 `8/3/3/3/3` 合成 gold contract 并复算参考 SQL |
 | 前序能力 | `EVIDENCE-ANSWER-007`：由完整 evidence 生成带精确来源的确定性 `answer-v1` |
@@ -12,8 +12,8 @@
 | 不做什么 | 未调用模型、未计算指标、未调提示词、未改工作流、FastAPI、网页或 Docker |
 | 完成门 | 20 条和 ID 固定；成功/越权参考 SQL 路由与结果一致；非执行类别合同明确；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | 本地分支 `codex/eval-dataset` 基于已同步的 `main@887f20f` |
-| 阻碍 | 无工程阻碍；当前切片只在本地验证，尚未推送或运行远端 CI |
+| 项目基线 | Draft PR #5：`codex/eval-dataset` → `main@887f20f` |
+| 阻碍 | 无工程阻碍；PR #5 等待评审，implementation SHA `33653d2` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -92,7 +92,9 @@
   检查通过。
 - 当前数据集不是模型运行结果，尚无执行成功率、答案正确率或人工介入率。完整合同见
   [`docs/work/eval-dataset.md`](work/eval-dataset.md)。
-- 当前分支未推送，因此不得把本地测试写成远端 CI 已通过。
+- [Draft PR #5](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/5) 已创建；
+  [CI run 30690243508](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30690243508)
+  在 implementation SHA `33653d2` 上完成，结论为 `success`。
 
 ## APPROVAL-GATE-004 验证证据
 

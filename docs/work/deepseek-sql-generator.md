@@ -72,6 +72,6 @@
 - Python `3.13.12` 全量产品与合同测试 41 项通过；`compileall`、`pip check`、
   `git diff --check`、tracked secret pattern scan、`.local` 未跟踪检查和产品不反向导入 `evals`
   检查通过。
-- [Draft PR #7](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/7) 已创建；
-  [CI run 30692232491](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30692232491)
-  在 implementation SHA `120a458` 上完成，结论为 `success`。
+- [PR #7](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/7) 已合并为 `ee4758b`；
+  [main CI run 30693856324](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30693856324)
+  在该 merge commit 上完成，结论为 `success`。

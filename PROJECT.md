@@ -67,8 +67,9 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
 - 正式 Provider plan 已支持五类 action；`run-record-v5` 直接投影 `provider_action`，并把
   `clarify`、`no_answer`、`block` 持久化为独立零执行终态。`unsafe_operation` 携带审计 SQL，
   但 action 本身固定进入 `can_execute=false` 的审批；人工批准仍不能触发执行。
-- 离线工作流核心、审批门、结果证据、确定性回答、固定评测合同和 Provider 探针已分别由
-  PR #1 至 PR #6 合并到 `main`；探针 merge commit `604ccf4` 的 33 个测试与远端 CI 通过。
+- 离线工作流核心、审批门、结果证据、确定性回答、固定评测合同、Provider 探针和正式 Provider
+  adapter 已分别由 PR #1 至 PR #7 合并到 `main`；PR #7 merge commit `ee4758b` 的 41 项测试与
+  远端 CI 通过。
 
 业务语义评测、真实身份权限、FastAPI、网页、模型评测运行与指标、Docker
 仍待实现。当前 answer 是确定性结果投影；evidence 指纹不是数字签名，也不证明 SQL 的业务

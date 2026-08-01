@@ -12,8 +12,8 @@
 | 不做什么 | 不调用真实 Provider，不跑 20 条评测或指标，不做 API/网页/Docker，不新增依赖 |
 | 完成门 | 已满足：五类严格 plan；三类稳定零执行终态；越权审批不可执行；43 项测试通过 |
 | 风险 | `run-record-v5` 已版本化决策字段；模型 action 与 SQLite 机械只读边界均有独立回归测试 |
-| 项目基线 | 本地 `codex/provider-decision-contract`；切片起点 `852dca7`，包含 Draft PR #7 与决策探针提交 |
-| 阻碍 | 无工程阻碍；本地提交尚未推送，且本轮没有远端写入授权 |
+| 项目基线 | 本地 `codex/provider-decision-contract`；切片起点 `852dca7`，基于已合并 PR #7 head 并含决策探针 |
+| 阻碍 | 无工程阻碍；PR #7 已合并且 main CI 通过，决策探针与当前合同仍仅在本地分支 |
 
 ## 复用审查
 
@@ -112,9 +112,9 @@
 - Python `3.13.12` 全量产品与合同测试 41 项通过；`compileall`、`pip check`、
   `git diff --check`、tracked secret pattern scan、`.local` 未跟踪检查和产品不反向导入 `evals`
   检查通过。
-- [Draft PR #7](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/7) 已创建；
-  [CI run 30692232491](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30692232491)
-  在 implementation SHA `120a458` 上完成，结论为 `success`。
+- [PR #7](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/7) 已合并为 `ee4758b`；
+  [main CI run 30693856324](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30693856324)
+  在该 merge commit 上完成，结论为 `success`。
 
 ## PROVIDER-DECISION-PROBE-011 验证证据
 

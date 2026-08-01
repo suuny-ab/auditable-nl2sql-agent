@@ -16,6 +16,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
+from .answer import AnswerCompositionError, compose_answer
 from .database import (
     QueryExecutionError,
     QueryTimeoutError,
@@ -41,7 +42,7 @@ CANONICAL_SQL = (
     "AND sales_order.order_date >= '2026-01-01' "
     "AND sales_order.order_date < '2026-04-01'"
 )
-RUN_RECORD_SCHEMA_VERSION = "run-record-v3"
+RUN_RECORD_SCHEMA_VERSION = "run-record-v4"
 DEFAULT_APPROVAL_ROW_LIMIT = 5
 DEFAULT_RESULT_ROW_LIMIT = 100
 
@@ -103,6 +104,7 @@ class WorkflowState(TypedDict, total=False):
     result_row_limit: int
     result_validation: dict[str, Any]
     evidence: dict[str, Any]
+    answer: dict[str, Any]
     status: str
     error_code: str | None
     error_message: str | None
@@ -578,6 +580,32 @@ def _build_graph(
             ],
         }
 
+    def compose_answer_node(state: WorkflowState) -> dict[str, Any]:
+        try:
+            answer = compose_answer(state["evidence"])
+        except AnswerCompositionError as exc:
+            return _failure(
+                state,
+                node="compose_answer",
+                code=exc.code,
+                message=str(exc),
+            )
+        return {
+            "answer": answer,
+            "status": "answer_ready",
+            "trajectory": [
+                _event(
+                    state,
+                    node="compose_answer",
+                    status="completed",
+                    details={
+                        "schema_version": answer["schema_version"],
+                        "source_count": len(answer["source"]["references"]),
+                    },
+                )
+            ],
+        }
+
     def finish(state: WorkflowState) -> dict[str, Any]:
         return {
             "status": "completed",
@@ -588,7 +616,7 @@ def _build_graph(
                     state,
                     node="finish",
                     status="completed",
-                    details={"result_available": True},
+                    details={"result_available": True, "answer_available": True},
                 )
             ],
         }
@@ -614,6 +642,9 @@ def _build_graph(
         return "stop" if state["status"] == "failed" else "bind_evidence"
 
     def after_binding(state: WorkflowState) -> str:
+        return "stop" if state["status"] == "failed" else "compose_answer"
+
+    def after_answer(state: WorkflowState) -> str:
         return "stop" if state["status"] == "failed" else "finish"
 
     builder = StateGraph(WorkflowState)
@@ -624,6 +655,7 @@ def _build_graph(
     builder.add_node("execute_sql", execute_sql)
     builder.add_node("validate_result", validate_result_node)
     builder.add_node("bind_evidence", bind_evidence_node)
+    builder.add_node("compose_answer", compose_answer_node)
     builder.add_node("finish", finish)
     builder.add_edge(START, "load_schema")
     builder.add_conditional_edges(
@@ -653,7 +685,12 @@ def _build_graph(
         {"stop": END, "bind_evidence": "bind_evidence"},
     )
     builder.add_conditional_edges(
-        "bind_evidence", after_binding, {"stop": END, "finish": "finish"}
+        "bind_evidence",
+        after_binding,
+        {"stop": END, "compose_answer": "compose_answer"},
+    )
+    builder.add_conditional_edges(
+        "compose_answer", after_answer, {"stop": END, "finish": "finish"}
     )
     builder.add_edge("finish", END)
     return builder.compile(checkpointer=checkpointer)
@@ -841,6 +878,7 @@ class WorkflowRunner:
             "result_row_limit": state["result_row_limit"],
             "result_validation": state.get("result_validation"),
             "evidence": state.get("evidence"),
+            "answer": state.get("answer"),
             "attempt_count": state.get("attempt_count", 0),
             "error_code": state.get("error_code"),
             "error_message": state.get("error_message"),

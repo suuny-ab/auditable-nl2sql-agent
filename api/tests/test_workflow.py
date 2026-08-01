@@ -11,8 +11,10 @@ import unittest
 from contextlib import closing
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from auditable_nl2sql import (
+    AnswerCompositionError,
     CANONICAL_QUESTION,
     DuplicateRunError,
     InvalidApprovalDecisionError,
@@ -52,6 +54,8 @@ TRUNCATED_SQL = (
     "SELECT order_id, product_id FROM order_items "
     "ORDER BY order_id, product_id LIMIT 11"
 )
+EMPTY_QUESTION = "查询不存在的订单"
+EMPTY_SQL = "SELECT order_id FROM orders WHERE order_id = 'missing' LIMIT 1"
 
 
 def _sha256(path: Path) -> str:
@@ -78,7 +82,7 @@ class WorkflowRunnerTests(unittest.TestCase):
                 question=CANONICAL_QUESTION,
             )
 
-        self.assertEqual(record["schema_version"], "run-record-v3")
+        self.assertEqual(record["schema_version"], "run-record-v4")
         self.assertEqual(record["status"], "completed")
         self.assertEqual(record["query_columns"], ["revenue"])
         self.assertEqual(record["query_rows"], [[5946.0]])
@@ -89,6 +93,12 @@ class WorkflowRunnerTests(unittest.TestCase):
         self.assertEqual(record["result_validation"]["status"], "passed")
         self.assertTrue(verify_evidence(record["evidence"]))
         self.assertEqual(record["evidence"]["payload"]["run_id"], "success-001")
+        self.assertEqual(record["answer"]["schema_version"], "answer-v1")
+        self.assertEqual(record["answer"]["text"], "查询结果：revenue = 5946.0。")
+        self.assertEqual(
+            record["answer"]["source"]["evidence_fingerprint"],
+            record["evidence"]["fingerprint"]["value"],
+        )
         self.assertEqual(
             [event["node"] for event in record["trajectory"]],
             [
@@ -98,14 +108,15 @@ class WorkflowRunnerTests(unittest.TestCase):
                 "execute_sql",
                 "validate_result",
                 "bind_evidence",
+                "compose_answer",
                 "finish",
             ],
         )
         self.assertEqual(
             [event["sequence"] for event in record["trajectory"]],
-            [1, 2, 3, 4, 5, 6, 7],
+            [1, 2, 3, 4, 5, 6, 7, 8],
         )
-        self.assertGreaterEqual(record["checkpoint_count"], 8)
+        self.assertGreaterEqual(record["checkpoint_count"], 9)
         json.dumps(record, allow_nan=False, ensure_ascii=False)
         self.assertEqual(_sha256(self.business_database), before)
 
@@ -148,6 +159,7 @@ class WorkflowRunnerTests(unittest.TestCase):
         self.assertEqual(record["attempt_count"], 1)
         self.assertEqual(record["query_rows"], [])
         self.assertIsNone(record["evidence"])
+        self.assertIsNone(record["answer"])
         self.assertEqual(
             [event["node"] for event in record["trajectory"]],
             ["load_schema", "draft_sql", "assess_sql", "execute_sql"],
@@ -182,6 +194,7 @@ class WorkflowRunnerTests(unittest.TestCase):
         self.assertEqual(record["attempt_count"], 0)
         self.assertEqual(record["query_rows"], [])
         self.assertIsNone(record["evidence"])
+        self.assertIsNone(record["answer"])
         self.assertEqual(record["approval"]["decision"], "approved")
         self.assertEqual(record["trajectory"][-1]["node"], "approval_gate")
         self.assertEqual(_sha256(self.business_database), before)
@@ -256,6 +269,10 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(approved["attempt_count"], 1)
         self.assertEqual(len(approved["query_rows"]), 6)
         self.assertTrue(verify_evidence(approved["evidence"]))
+        self.assertEqual(
+            approved["answer"]["text"],
+            "查询返回 6 行，字段：order_id、product_id。",
+        )
         self.assertEqual(approved["approval"]["decision"], "approved")
         self.assertEqual(
             approved["approval"]["decision_id"],
@@ -271,6 +288,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
                 "execute_sql",
                 "validate_result",
                 "bind_evidence",
+                "compose_answer",
                 "finish",
             ],
         )
@@ -342,6 +360,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(rejected["attempt_count"], 0)
         self.assertEqual(rejected["query_rows"], [])
         self.assertIsNone(rejected["evidence"])
+        self.assertIsNone(rejected["answer"])
         self.assertEqual(rejected["approval"]["decision"], "rejected")
         self.assertEqual(rejected["trajectory"][-1]["node"], "approval_gate")
         self.assertEqual(_sha256(self.business_database), before)
@@ -368,6 +387,10 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(bounded["status"], "completed")
         self.assertEqual(len(bounded["query_rows"]), 5)
         self.assertTrue(verify_evidence(bounded["evidence"]))
+        self.assertEqual(
+            bounded["answer"]["text"],
+            "查询返回 5 行，字段：order_id。",
+        )
         self.assertIsNone(bounded["approval"])
         self.assertEqual(unbounded["status"], "pending_approval")
         self.assertEqual(unbounded["attempt_count"], 0)
@@ -388,6 +411,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(record["attempt_count"], 0)
         self.assertIsNone(record["generated_sql"])
         self.assertIsNone(record["evidence"])
+        self.assertIsNone(record["answer"])
         self.assertEqual(
             [event["node"] for event in record["trajectory"]],
             ["load_schema", "draft_sql"],
@@ -408,6 +432,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(record["error_code"], "schema_unavailable")
         self.assertEqual(record["attempt_count"], 0)
         self.assertIsNone(record["evidence"])
+        self.assertIsNone(record["answer"])
         self.assertEqual(
             [event["node"] for event in record["trajectory"]],
             ["load_schema"],
@@ -462,6 +487,54 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(reopened["status"], "completed")
         self.assertEqual(reopened["query_rows"], [[5946.0]])
         self.assertTrue(verify_evidence(reopened["evidence"]))
+        self.assertEqual(reopened["answer"], original["answer"])
+
+    def test_empty_result_produces_a_conservative_answer(self) -> None:
+        generator = StaticSqlGenerator({EMPTY_QUESTION: EMPTY_SQL})
+        with WorkflowRunner(
+            self.business_database,
+            self.checkpoint_database,
+            generator=generator,
+        ) as runner:
+            record = runner.run(run_id="empty-001", question=EMPTY_QUESTION)
+
+        self.assertEqual(record["status"], "completed")
+        self.assertEqual(record["query_rows"], [])
+        self.assertEqual(record["answer"]["text"], "查询未返回数据。")
+        self.assertEqual(
+            record["answer"]["source"]["references"],
+            [
+                {
+                    "kind": "result_metadata",
+                    "path": "payload.result.returned_row_count",
+                    "value": 0,
+                }
+            ],
+        )
+
+    def test_answer_composition_failure_is_persisted_without_answer(self) -> None:
+        before = _sha256(self.business_database)
+        failure = AnswerCompositionError(
+            code="evidence_verification_failed",
+            message="evidence fingerprint verification failed",
+        )
+        with patch("auditable_nl2sql.workflow.compose_answer", side_effect=failure):
+            with WorkflowRunner(
+                self.business_database,
+                self.checkpoint_database,
+            ) as runner:
+                record = runner.run(
+                    run_id="answer-failure-001",
+                    question=CANONICAL_QUESTION,
+                )
+
+        self.assertEqual(record["status"], "failed")
+        self.assertEqual(record["error_code"], "evidence_verification_failed")
+        self.assertTrue(verify_evidence(record["evidence"]))
+        self.assertIsNone(record["answer"])
+        self.assertEqual(record["trajectory"][-1]["node"], "compose_answer")
+        self.assertEqual(record["trajectory"][-1]["status"], "failed")
+        self.assertEqual(_sha256(self.business_database), before)
 
     def test_truncated_result_fails_validation_without_evidence(self) -> None:
         before = _sha256(self.business_database)
@@ -498,6 +571,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertTrue(record["truncated"])
         self.assertEqual(record["result_validation"]["status"], "failed")
         self.assertIsNone(record["evidence"])
+        self.assertIsNone(record["answer"])
         self.assertEqual(record["trajectory"][-1]["node"], "validate_result")
         self.assertEqual(record["attempt_count"], 1)
         self.assertEqual(_sha256(self.business_database), before)

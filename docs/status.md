@@ -4,16 +4,16 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `ready` |
+| `state` | `review_pending` |
 | 更新时间 | `2026-08-01` |
-| 最近完成 | `APPROVAL-GATE-004`：机械 SQL 审批分类、真实中断恢复、决定幂等与不可绕过只读边界 |
-| 前序能力 | `WORKFLOW-CORE-002`：离线 LangGraph 状态机、独立 checkpoint、稳定 trajectory 与失败终态 |
-| 做什么 | 高行数和写操作 SQL 在执行前持久化挂起；同一 run ID 可跨进程批准或拒绝 |
-| 不做什么 | 未接 LLM、真实身份权限、自动重试、FastAPI、网页、Docker、Postgres 或完整评测 |
-| 完成门 | 普通查询直通；高行数批准只执行一次；拒绝和写操作批准不执行；重复决定显式失败；业务库不变 |
+| 最近完成 | `RESULT-EVIDENCE-006`：结果失败关闭校验、版本化 evidence、跨进程指纹重算 |
+| 前序能力 | `APPROVAL-GATE-004`：机械 SQL 审批分类、真实中断恢复、决定幂等与不可绕过只读边界 |
+| 做什么 | SQL 结果通过结构与截断校验后，与问题、SQL、schema 和校验回执绑定为稳定 evidence |
+| 不做什么 | 未接 LLM、业务语义判断、自然语言回答、FastAPI、网页、Docker、Postgres 或完整评测 |
+| 完成门 | 正常及审批成功产证据；跨进程可重算；截断、拒绝、写操作与执行错误均不产证据；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | 本地与远端分支 `codex/approval-gate` 基于已合并并通过 CI 的 `origin/main@63381f9` |
-| 阻碍 | 无工程阻碍；Draft PR #2 已打开且 CI 通过，尚未授权合并 |
+| 项目基线 | Draft PR #3：`codex/result-evidence` → `main@d7be385` |
+| 阻碍 | 无工程阻碍；PR #3 等待评审，implementation SHA `150af40` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -42,6 +42,24 @@
   [main CI run 30684609206](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30684609206)
   在该 SHA 上完成，结论为 `success`。
 
+## RESULT-EVIDENCE-006 验证证据
+
+- 成功路径固定经过 `execute_sql → validate_result → bind_evidence → finish`；普通 run 与跨进程
+  批准后的 run 均得到可由 `verify_evidence` 重算的 `evidence-v1`。
+- 第二个真实 Python 进程按 run ID 回查 checkpoint 并重算 evidence 指纹，generator 与图节点
+  均未重新执行。
+- 创建 run 时的结果硬上限持久化在 state；以 5 行上限创建的挂起 run，在采用默认 100 行上限
+  的新 runner 中恢复后仍只返回 5 行，并以 `failed/result_truncated` 停在 `validate_result`，不产
+  evidence。
+- 纯校验器对空列、行宽错误、截断、`NaN` 和 `bytes` 分别失败关闭；错误 SQL、未知问题、
+  缺失 schema、审批拒绝和写 SQL 批准路径均不产 evidence。
+- Python `3.13.12` 全量产品测试 25 项通过，`compileall`、`pip check` 与 `git diff --check`
+  通过；成功、执行失败、写操作拒绝与截断路径均校验业务数据库哈希不变。
+- 完整合同与声明边界见 [`docs/work/result-evidence.md`](work/result-evidence.md)。
+  [Draft PR #3](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/3) 已创建；
+  [CI run 30687228936](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30687228936)
+  在 implementation SHA `150af40` 上完成，结论为 `success`。
+
 ## APPROVAL-GATE-004 验证证据
 
 - SQLite `EXPLAIN QUERY PLAN` 与现有 authorizer 组成不执行结果计划的机械校验；写操作和
@@ -51,14 +69,25 @@
 - 写 SQL 的审批状态固定 `can_execute=false`；即使批准也以
   `approval_cannot_override_read_only` 结束，执行尝试为 0，业务库哈希不变。
 - 当前全量测试为 20 项本地通过；完整合同见
-  [`docs/work/approval-gate.md`](work/approval-gate.md)。候选已进入
-  [Draft PR #2](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/2)，当前 HEAD 的远端 CI
-  结论为 `success`，PR 未获得合并授权。
+  [`docs/work/approval-gate.md`](work/approval-gate.md)。[PR #2](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/2)
+  已合并为 `d7be385`；
+  [main CI run 30685924831](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30685924831)
+  在该 SHA 上完成，结论为 `success`。
+
+## EVIDENCE-FINGERPRINT-PROBE-005 验证证据
+
+- 两个独立 Python 进程对不同字典插入顺序的同一 evidence 得到相同的 2932 字节规范 JSON 和
+  SHA-256 `b5522364…60dc`。
+- SQL、schema、结果三类单字段变化全部产生不同指纹；截断、行宽错误、`NaN`、`bytes` 四类
+  非法输入全部拒绝。
+- 最终 7 项机器断言全部通过，业务库 SHA-256 始终为 `564572c5…1ea7`；未修改产品代码或依赖。
+- 完整合同、指纹和声明边界见
+  [`docs/work/evidence-fingerprint-probe.md`](work/evidence-fingerprint-probe.md)。
 
 ## 下一候选
 
-下一切片候选是结果校验与证据绑定：把 SQL、schema 快照、结果行和校验结论绑定为稳定证据
-对象，但仍不接真实 LLM、FastAPI、网页或完整评测。
+下一切片候选是最小证据回答：只根据已绑定的 evidence 生成确定性回答投影，让工作流具备
+“回答”终态。仍不接真实 LLM、FastAPI、网页或完整评测，也不把格式化回答当成业务语义正确。
 
 ## 审批中断/恢复最小风险探针
 

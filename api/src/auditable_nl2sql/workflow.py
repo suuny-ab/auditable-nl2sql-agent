@@ -24,6 +24,12 @@ from .database import (
     read_schema,
     validate_read_only_statement,
 )
+from .evidence import (
+    EvidenceBindingError,
+    ResultValidationError,
+    bind_evidence,
+    validate_result,
+)
 
 
 CANONICAL_QUESTION = "2026年第一季度非取消订单销售额是多少？"
@@ -35,8 +41,9 @@ CANONICAL_SQL = (
     "AND sales_order.order_date >= '2026-01-01' "
     "AND sales_order.order_date < '2026-04-01'"
 )
-RUN_RECORD_SCHEMA_VERSION = "run-record-v2"
+RUN_RECORD_SCHEMA_VERSION = "run-record-v3"
 DEFAULT_APPROVAL_ROW_LIMIT = 5
+DEFAULT_RESULT_ROW_LIMIT = 100
 
 
 class DuplicateRunError(ValueError):
@@ -93,6 +100,9 @@ class WorkflowState(TypedDict, total=False):
     query_columns: list[str]
     query_rows: list[list[Any]]
     truncated: bool
+    result_row_limit: int
+    result_validation: dict[str, Any]
+    evidence: dict[str, Any]
     status: str
     error_code: str | None
     error_message: str | None
@@ -438,7 +448,11 @@ def _build_graph(
     def execute_sql(state: WorkflowState) -> dict[str, Any]:
         attempt_count = state.get("attempt_count", 0) + 1
         try:
-            result = execute_read_only(business_database, state["generated_sql"])
+            result = execute_read_only(
+                business_database,
+                state["generated_sql"],
+                max_rows=state["result_row_limit"],
+            )
             rows = [
                 [_json_scalar(value) for value in row]
                 for row in result.rows
@@ -494,6 +508,76 @@ def _build_graph(
             ],
         }
 
+    def validate_result_node(state: WorkflowState) -> dict[str, Any]:
+        try:
+            validation = validate_result(
+                columns=state["query_columns"],
+                rows=state["query_rows"],
+                truncated=state["truncated"],
+            )
+        except ResultValidationError as exc:
+            update = _failure(
+                state,
+                node="validate_result",
+                code=exc.code,
+                message=str(exc),
+            )
+            update["result_validation"] = {
+                "status": "failed",
+                "checks": exc.checks,
+                "error_code": exc.code,
+            }
+            return update
+        return {
+            "result_validation": validation,
+            "status": "result_validated",
+            "trajectory": [
+                _event(
+                    state,
+                    node="validate_result",
+                    status="completed",
+                    details={
+                        "returned_row_count": validation["returned_row_count"],
+                    },
+                )
+            ],
+        }
+
+    def bind_evidence_node(state: WorkflowState) -> dict[str, Any]:
+        try:
+            evidence = bind_evidence(
+                run_id=state["run_id"],
+                question=state["question"],
+                sql=state["generated_sql"],
+                schema_snapshot=state["schema_snapshot"],
+                columns=state["query_columns"],
+                rows=state["query_rows"],
+                truncated=state["truncated"],
+                validation=state["result_validation"],
+            )
+        except (EvidenceBindingError, ResultValidationError):
+            return _failure(
+                state,
+                node="bind_evidence",
+                code="evidence_binding_error",
+                message="validated query result could not be bound to evidence",
+            )
+        return {
+            "evidence": evidence,
+            "status": "evidence_bound",
+            "trajectory": [
+                _event(
+                    state,
+                    node="bind_evidence",
+                    status="completed",
+                    details={
+                        "schema_version": evidence["schema_version"],
+                        "fingerprint": evidence["fingerprint"]["value"],
+                    },
+                )
+            ],
+        }
+
     def finish(state: WorkflowState) -> dict[str, Any]:
         return {
             "status": "completed",
@@ -524,6 +608,12 @@ def _build_graph(
         return "execute_sql" if state["status"] == "approval_granted" else "stop"
 
     def after_execute(state: WorkflowState) -> str:
+        return "stop" if state["status"] == "failed" else "validate_result"
+
+    def after_validation(state: WorkflowState) -> str:
+        return "stop" if state["status"] == "failed" else "bind_evidence"
+
+    def after_binding(state: WorkflowState) -> str:
         return "stop" if state["status"] == "failed" else "finish"
 
     builder = StateGraph(WorkflowState)
@@ -532,6 +622,8 @@ def _build_graph(
     builder.add_node("assess_sql", assess_sql)
     builder.add_node("approval_gate", approval_gate)
     builder.add_node("execute_sql", execute_sql)
+    builder.add_node("validate_result", validate_result_node)
+    builder.add_node("bind_evidence", bind_evidence_node)
     builder.add_node("finish", finish)
     builder.add_edge(START, "load_schema")
     builder.add_conditional_edges(
@@ -551,7 +643,17 @@ def _build_graph(
         {"stop": END, "execute_sql": "execute_sql"},
     )
     builder.add_conditional_edges(
-        "execute_sql", after_execute, {"stop": END, "finish": "finish"}
+        "execute_sql",
+        after_execute,
+        {"stop": END, "validate_result": "validate_result"},
+    )
+    builder.add_conditional_edges(
+        "validate_result",
+        after_validation,
+        {"stop": END, "bind_evidence": "bind_evidence"},
+    )
+    builder.add_conditional_edges(
+        "bind_evidence", after_binding, {"stop": END, "finish": "finish"}
     )
     builder.add_edge("finish", END)
     return builder.compile(checkpointer=checkpointer)
@@ -567,14 +669,18 @@ class WorkflowRunner:
         *,
         generator: SqlGenerator | None = None,
         approval_row_limit: int = DEFAULT_APPROVAL_ROW_LIMIT,
+        max_result_rows: int = DEFAULT_RESULT_ROW_LIMIT,
     ) -> None:
         if type(approval_row_limit) is not int or approval_row_limit <= 0:
             raise ValueError("approval_row_limit must be a positive integer")
+        if type(max_result_rows) is not int or max_result_rows <= 0:
+            raise ValueError("max_result_rows must be a positive integer")
         self._business_database = Path(business_database).resolve()
         self._checkpoint_database = Path(checkpoint_database).resolve()
         if self._business_database == self._checkpoint_database:
             raise ValueError("business and checkpoint databases must be different files")
         self._checkpoint_database.parent.mkdir(parents=True, exist_ok=True)
+        self._max_result_rows = max_result_rows
         self._connection = sqlite3.connect(
             self._checkpoint_database,
             check_same_thread=False,
@@ -627,6 +733,7 @@ class WorkflowRunner:
                 "error_code": None,
                 "error_message": None,
                 "attempt_count": 0,
+                "result_row_limit": self._max_result_rows,
                 "trajectory": [],
             },
             config,
@@ -731,6 +838,9 @@ class WorkflowRunner:
             "query_columns": state.get("query_columns", []),
             "query_rows": state.get("query_rows", []),
             "truncated": state.get("truncated"),
+            "result_row_limit": state["result_row_limit"],
+            "result_validation": state.get("result_validation"),
+            "evidence": state.get("evidence"),
             "attempt_count": state.get("attempt_count", 0),
             "error_code": state.get("error_code"),
             "error_message": state.get("error_message"),

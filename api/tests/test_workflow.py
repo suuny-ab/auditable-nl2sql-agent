@@ -19,6 +19,7 @@ from auditable_nl2sql import (
     RunNotFoundError,
     StaticSqlGenerator,
     WorkflowRunner,
+    verify_evidence,
 )
 from auditable_nl2sql.demo import create_demo_database
 
@@ -46,6 +47,11 @@ HIGH_ROW_SQL = (
     "SELECT order_id, product_id FROM order_items "
     "ORDER BY order_id, product_id LIMIT 6"
 )
+TRUNCATED_QUESTION = "列出十一条订单商品记录"
+TRUNCATED_SQL = (
+    "SELECT order_id, product_id FROM order_items "
+    "ORDER BY order_id, product_id LIMIT 11"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -72,22 +78,34 @@ class WorkflowRunnerTests(unittest.TestCase):
                 question=CANONICAL_QUESTION,
             )
 
-        self.assertEqual(record["schema_version"], "run-record-v2")
+        self.assertEqual(record["schema_version"], "run-record-v3")
         self.assertEqual(record["status"], "completed")
         self.assertEqual(record["query_columns"], ["revenue"])
         self.assertEqual(record["query_rows"], [[5946.0]])
         self.assertEqual(record["attempt_count"], 1)
         self.assertIsNone(record["error_code"])
         self.assertIsNone(record["approval"])
+        self.assertEqual(record["result_row_limit"], 100)
+        self.assertEqual(record["result_validation"]["status"], "passed")
+        self.assertTrue(verify_evidence(record["evidence"]))
+        self.assertEqual(record["evidence"]["payload"]["run_id"], "success-001")
         self.assertEqual(
             [event["node"] for event in record["trajectory"]],
-            ["load_schema", "draft_sql", "assess_sql", "execute_sql", "finish"],
+            [
+                "load_schema",
+                "draft_sql",
+                "assess_sql",
+                "execute_sql",
+                "validate_result",
+                "bind_evidence",
+                "finish",
+            ],
         )
         self.assertEqual(
             [event["sequence"] for event in record["trajectory"]],
-            [1, 2, 3, 4, 5],
+            [1, 2, 3, 4, 5, 6, 7],
         )
-        self.assertGreaterEqual(record["checkpoint_count"], 6)
+        self.assertGreaterEqual(record["checkpoint_count"], 8)
         json.dumps(record, allow_nan=False, ensure_ascii=False)
         self.assertEqual(_sha256(self.business_database), before)
 
@@ -129,6 +147,7 @@ class WorkflowRunnerTests(unittest.TestCase):
         self.assertEqual(record["error_code"], "query_execution_error")
         self.assertEqual(record["attempt_count"], 1)
         self.assertEqual(record["query_rows"], [])
+        self.assertIsNone(record["evidence"])
         self.assertEqual(
             [event["node"] for event in record["trajectory"]],
             ["load_schema", "draft_sql", "assess_sql", "execute_sql"],
@@ -162,6 +181,7 @@ class WorkflowRunnerTests(unittest.TestCase):
         self.assertEqual(record["error_code"], "approval_cannot_override_read_only")
         self.assertEqual(record["attempt_count"], 0)
         self.assertEqual(record["query_rows"], [])
+        self.assertIsNone(record["evidence"])
         self.assertEqual(record["approval"]["decision"], "approved")
         self.assertEqual(record["trajectory"][-1]["node"], "approval_gate")
         self.assertEqual(_sha256(self.business_database), before)
@@ -235,6 +255,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(approved["status"], "completed")
         self.assertEqual(approved["attempt_count"], 1)
         self.assertEqual(len(approved["query_rows"]), 6)
+        self.assertTrue(verify_evidence(approved["evidence"]))
         self.assertEqual(approved["approval"]["decision"], "approved")
         self.assertEqual(
             approved["approval"]["decision_id"],
@@ -248,6 +269,8 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
                 "assess_sql",
                 "approval_gate",
                 "execute_sql",
+                "validate_result",
+                "bind_evidence",
                 "finish",
             ],
         )
@@ -318,6 +341,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(rejected["error_code"], "approval_rejected")
         self.assertEqual(rejected["attempt_count"], 0)
         self.assertEqual(rejected["query_rows"], [])
+        self.assertIsNone(rejected["evidence"])
         self.assertEqual(rejected["approval"]["decision"], "rejected")
         self.assertEqual(rejected["trajectory"][-1]["node"], "approval_gate")
         self.assertEqual(_sha256(self.business_database), before)
@@ -343,6 +367,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
 
         self.assertEqual(bounded["status"], "completed")
         self.assertEqual(len(bounded["query_rows"]), 5)
+        self.assertTrue(verify_evidence(bounded["evidence"]))
         self.assertIsNone(bounded["approval"])
         self.assertEqual(unbounded["status"], "pending_approval")
         self.assertEqual(unbounded["attempt_count"], 0)
@@ -362,6 +387,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(record["error_code"], "unsupported_question")
         self.assertEqual(record["attempt_count"], 0)
         self.assertIsNone(record["generated_sql"])
+        self.assertIsNone(record["evidence"])
         self.assertEqual(
             [event["node"] for event in record["trajectory"]],
             ["load_schema", "draft_sql"],
@@ -381,6 +407,7 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(record["status"], "failed")
         self.assertEqual(record["error_code"], "schema_unavailable")
         self.assertEqual(record["attempt_count"], 0)
+        self.assertIsNone(record["evidence"])
         self.assertEqual(
             [event["node"] for event in record["trajectory"]],
             ["load_schema"],
@@ -403,14 +430,17 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
 import json
 import sys
 from typing import Any
-from auditable_nl2sql import WorkflowRunner
+from auditable_nl2sql import WorkflowRunner, verify_evidence
 
 class MustNotRun:
     def generate(self, question: str, schema_snapshot: list[dict[str, Any]]) -> str:
         raise AssertionError("get_run must not execute graph nodes")
 
 with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
-    print(json.dumps(runner.get_run("restart-001"), ensure_ascii=False, sort_keys=True))
+    record = runner.get_run("restart-001")
+    if not verify_evidence(record["evidence"]):
+        raise AssertionError("persisted evidence fingerprint did not verify")
+    print(json.dumps(record, ensure_ascii=False, sort_keys=True))
 """
         completed = subprocess.run(
             [
@@ -431,6 +461,46 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
         self.assertEqual(reopened, original)
         self.assertEqual(reopened["status"], "completed")
         self.assertEqual(reopened["query_rows"], [[5946.0]])
+        self.assertTrue(verify_evidence(reopened["evidence"]))
+
+    def test_truncated_result_fails_validation_without_evidence(self) -> None:
+        before = _sha256(self.business_database)
+        generator = StaticSqlGenerator({TRUNCATED_QUESTION: TRUNCATED_SQL})
+        with WorkflowRunner(
+            self.business_database,
+            self.checkpoint_database,
+            generator=generator,
+            max_result_rows=5,
+        ) as runner:
+            pending = runner.run(
+                run_id="truncated-001",
+                question=TRUNCATED_QUESTION,
+            )
+
+        self.assertEqual(pending["status"], "pending_approval")
+
+        with WorkflowRunner(
+            self.business_database,
+            self.checkpoint_database,
+            generator=MustNotGenerate(),
+            max_result_rows=100,
+        ) as runner:
+            record = runner.decide(
+                run_id="truncated-001",
+                decision_id="approve-truncated-001",
+                approved=True,
+            )
+
+        self.assertEqual(record["status"], "failed")
+        self.assertEqual(record["error_code"], "result_truncated")
+        self.assertEqual(record["result_row_limit"], 5)
+        self.assertEqual(len(record["query_rows"]), 5)
+        self.assertTrue(record["truncated"])
+        self.assertEqual(record["result_validation"]["status"], "failed")
+        self.assertIsNone(record["evidence"])
+        self.assertEqual(record["trajectory"][-1]["node"], "validate_result")
+        self.assertEqual(record["attempt_count"], 1)
+        self.assertEqual(_sha256(self.business_database), before)
 
     def test_duplicate_run_and_shared_database_path_fail_closed(self) -> None:
         with WorkflowRunner(
@@ -448,6 +518,12 @@ with WorkflowRunner(sys.argv[1], sys.argv[2], generator=MustNotRun()) as runner:
                 self.business_database,
                 self.checkpoint_database,
                 approval_row_limit=0,
+            )
+        with self.assertRaises(ValueError):
+            WorkflowRunner(
+                self.business_database,
+                self.checkpoint_database,
+                max_result_rows=0,
             )
 
 

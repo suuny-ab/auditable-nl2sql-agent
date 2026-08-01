@@ -58,9 +58,12 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
 - DeepSeek 最小探针使用 `deepseek-v4-flash` 对 2 条成功问题和 1 条删除请求得到严格 JSON；
   加入稳定输出列合同后，两条只读 SQL 的结果命中 gold，删除请求在模型层阻断且执行次数为 0。
   这只证明当前凭据、接口和最小安全路由可行，不是正式 Provider 或模型评测能力。
-- 离线工作流核心、审批门、结果证据、确定性回答和固定评测合同已分别由 PR #1 至 PR #5
-  合并到 `main`；评测合同 merge commit `01db420` 的 33 个测试与远端 CI 通过。
+- 正式 `DeepSeekSqlGenerator` 默认禁用，显式启用后读取环境凭据；严格校验 JSON plan 与 usage，
+  并把脱敏 Provider 回执写入 trajectory。真实收入查询已完成 evidence/answer，真实删除请求在
+  `draft_sql` 阶段阻断且执行次数为 0；仍未产生 20 条评测指标。
+- 离线工作流核心、审批门、结果证据、确定性回答、固定评测合同和 Provider 探针已分别由
+  PR #1 至 PR #6 合并到 `main`；探针 merge commit `604ccf4` 的 33 个测试与远端 CI 通过。
 
-正式模型生成、业务语义校验与生成、真实身份权限、FastAPI、网页、模型评测运行与指标、Docker
+业务语义评测、真实身份权限、FastAPI、网页、模型评测运行与指标、Docker
 仍待实现。当前 answer 是确定性结果投影；evidence 指纹不是数字签名，也不证明 SQL 的业务
 语义正确。

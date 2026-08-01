@@ -31,6 +31,7 @@ from .evidence import (
     bind_evidence,
     validate_result,
 )
+from .provider import SqlGenerationError, SqlGenerationResult
 
 
 CANONICAL_QUESTION = "2026年第一季度非取消订单销售额是多少？"
@@ -68,7 +69,11 @@ class UnsupportedResultType(TypeError):
 
 
 class SqlGenerator(Protocol):
-    def generate(self, question: str, schema_snapshot: list[dict[str, Any]]) -> str:
+    def generate(
+        self,
+        question: str,
+        schema_snapshot: list[dict[str, Any]],
+    ) -> str | SqlGenerationResult:
         """Return SQL for a question and schema snapshot."""
 
 
@@ -157,7 +162,14 @@ def _failure(
     code: str,
     message: str,
     attempt_count: int | None = None,
+    details: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    event_details: dict[str, Any] = {
+        "error_code": code,
+        "error_message": message,
+    }
+    if details is not None:
+        event_details.update(details)
     update: dict[str, Any] = {
         "status": "failed",
         "error_code": code,
@@ -167,7 +179,7 @@ def _failure(
                 state,
                 node=node,
                 status="failed",
-                details={"error_code": code, "error_message": message},
+                details=event_details,
             )
         ],
     }
@@ -287,13 +299,25 @@ def _build_graph(
 
     def draft_sql(state: WorkflowState) -> dict[str, Any]:
         try:
-            sql = generator.generate(state["question"], state["schema_snapshot"])
+            generated = generator.generate(state["question"], state["schema_snapshot"])
         except UnsupportedQuestionError:
             return _failure(
                 state,
                 node="draft_sql",
                 code="unsupported_question",
                 message="question is outside the deterministic SQL stub",
+            )
+        except SqlGenerationError as exc:
+            return _failure(
+                state,
+                node="draft_sql",
+                code=exc.code,
+                message=str(exc),
+                details=(
+                    {"provider": exc.receipt}
+                    if exc.receipt is not None
+                    else None
+                ),
             )
         except Exception:
             return _failure(
@@ -302,6 +326,12 @@ def _build_graph(
                 code="generator_error",
                 message="SQL generator failed",
             )
+        provider_receipt = None
+        if isinstance(generated, SqlGenerationResult):
+            sql = generated.sql
+            provider_receipt = generated.receipt
+        else:
+            sql = generated
         if not isinstance(sql, str) or not sql.strip():
             return _failure(
                 state,
@@ -309,6 +339,9 @@ def _build_graph(
                 code="generator_error",
                 message="SQL generator returned an empty statement",
             )
+        details: dict[str, Any] = {"sql": sql}
+        if provider_receipt is not None:
+            details["provider"] = provider_receipt
         return {
             "generated_sql": sql,
             "status": "sql_ready",
@@ -317,7 +350,7 @@ def _build_graph(
                     state,
                     node="draft_sql",
                     status="completed",
-                    details={"sql": sql},
+                    details=details,
                 )
             ],
         }

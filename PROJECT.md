@@ -39,6 +39,13 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
 - schema 读取返回用户表、字段、主键和外键，不暴露 SQLite 内部表。
 - SQL 执行同时受 URI `mode=ro`、`query_only` 和 SQLite authorizer 约束，并限制返回行数和
   本地执行时间；写入、DDL、`ATTACH` 和 `PRAGMA` 失败关闭。
-- 首切片 7 个测试已在本地通过；这只证明 SQLite 事实层，不是完整 NL2SQL 或 Agent 能力。
+- 首切片 8 个测试已在本地和首次 GitHub Actions 中通过；这只证明 SQLite 事实层，不是完整
+  NL2SQL 或 Agent 能力。
+- 确定性 LangGraph 工作流已串联 schema、SQL stub 和只读执行，成功、无效 SQL、写操作拒绝、
+  未支持问题及缺失 schema 都形成持久化终态。
+- LangGraph checkpoint 写入独立 workflow SQLite；项目自有 JSON trajectory 随状态保存，
+  第二个独立 Python 进程可按 run ID 回查而不重新执行节点。
+- Python 3.13 的锁定依赖干净安装、16 个本地测试和 Draft PR #1 的远端 CI 已通过；这只证明
+  确定性离线工作流候选，不证明真实 NL2SQL 或审批闭环。
 
-LangGraph、模型生成、trajectory、审批门、FastAPI、网页、评测集和 Docker 仍待实现。
+真实模型生成、结果校验、证据绑定、审批中断/恢复、FastAPI、网页、评测集和 Docker 仍待实现。

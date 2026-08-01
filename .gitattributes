@@ -2,5 +2,7 @@
 .gitattributes text eol=lf
 *.md text eol=lf
 *.py text eol=lf
+*.lock text eol=lf
+*.txt text eol=lf
 *.toml text eol=lf
 *.yml text eol=lf

@@ -27,6 +27,12 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: "3.13"
+          cache: pip
+          cache-dependency-path: api/requirements-base.lock
+      - name: Install locked product dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-deps
+          --require-hashes --requirement api/requirements-base.lock
       - name: Compile product package
         run: python -m compileall -q api/src
       - name: Run read-only database tests

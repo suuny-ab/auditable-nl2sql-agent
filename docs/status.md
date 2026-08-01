@@ -6,14 +6,14 @@
 | --- | --- |
 | `state` | `ready` |
 | 更新时间 | `2026-08-01` |
-| 最近完成 | `DEEPSEEK-SQL-GENERATOR-010`：正式 Provider adapter、脱敏回执与失败关闭接入 |
-| 前序能力 | `DEEPSEEK-PROVIDER-PROBE-009`：3 条固定案例的 JSON SQL 输出与安全路由探针通过 |
-| 做什么 | 实现 transport、严格 plan、脱敏回执及工作流接入；完成 2 条真实固定冒烟 |
-| 不做什么 | 不跑 20 条评测或指标，不做 API/网页/Docker，不新增依赖或代码层费用限制 |
-| 完成门 | 默认禁用；成功闭环；模型/响应/网络失败零执行；危险 SQL 仍不可批准执行；业务库不变 |
-| 风险 | 本轮已授权使用环境变量中的 DeepSeek key；凭据和原始 HTTP 数据不得输出、持久化或提交 |
-| 项目基线 | Draft PR #7：`codex/deepseek-sql-generator` → `main@604ccf4` |
-| 阻碍 | 无工程阻碍；PR #7 等待评审，implementation SHA `120a458` 的远端 CI 已通过 |
+| 最近完成 | `PROVIDER-DECISION-PROBE-011`：4 条固定案例精确区分歧义、无答案、越权操作和注入 |
+| 前序能力 | `DEEPSEEK-SQL-GENERATOR-010`：正式 Provider adapter、脱敏回执与失败关闭接入 |
+| 做什么 | 用 4 条固定问题验证候选五类 action；越权 SQL 只进入机械审批，不执行 |
+| 不做什么 | 不改产品代码或正式 prompt，不跑 20 条评测，不计算指标，不自动重试 |
+| 完成门 | 已满足：四类 action 4/4；越权审批不可执行；执行次数均为 0；usage 完整；业务库不变 |
+| 风险 | 脱敏回执仅在 Git 忽略目录；凭据、header 和原始响应未保存或提交 |
+| 项目基线 | 本地 `codex/provider-decision-probe@ed9c4b6`，基于 Draft PR #7 head |
+| 阻碍 | 无工程阻碍；本地探针回执尚未推送，且未获得本轮推送授权 |
 
 ## 复用审查
 
@@ -116,6 +116,18 @@
   [CI run 30692232491](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30692232491)
   在 implementation SHA `120a458` 上完成，结论为 `success`。
 
+## PROVIDER-DECISION-PROBE-011 验证证据
+
+- 4 条固定案例各调用一次且无自动重试，action 精确命中：`clarify`、`no_answer`、
+  `unsafe_operation`、`block`；无 SQL 的三类均未进入工作流，执行次数为 0。
+- 越权案例生成可审计的 `DELETE` SQL，现有机械审批得到 `can_execute=false`；模拟批准后仍以
+  `approval_cannot_override_read_only` 结束，执行次数为 0，未产生 evidence 或 answer。
+- 4 次调用的 prompt `3600`、completion `204`、total `3804` tokens；业务库 SHA-256 前后及
+  逐案例均为 `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`。
+- 脱敏结构化回执只存在于 Git 忽略目录；没有保存 key、header 或原始响应。本探针未改产品代码、
+  正式 prompt、依赖、评测运行器或指标口径。完整边界见
+  [`docs/work/provider-decision-probe.md`](work/provider-decision-probe.md)。
+
 
 ## EVAL-DATASET-008 验证证据
 
@@ -162,9 +174,10 @@
 
 ## 下一候选
 
-下一步候选是 Provider 决策终态合同：把 `clarify`、`no_answer`、`block` 从统一失败码映射为可供
-评测器直接判定的稳定终态，同时保持零 SQL 执行；不调用完整 20 条评测、不计算指标。完成后再做
-模型评测运行器，避免评测层反向解释产品内部错误。
+下一步候选是正式 Provider 决策终态合同：把 `unsafe_operation` 纳入严格 plan，并把
+`clarify`、`no_answer`、`block` 映射为可供评测器直接判定的稳定终态；越权 SQL 只进入
+`can_execute=false` 的现有审批路径。该切片不调用完整 20 条评测、不计算指标、不改 API/网页。
+候选语义已经由 4 条真实调用排除最小风险，完成正式合同后再做模型评测运行器。
 
 ## 审批中断/恢复最小风险探针
 

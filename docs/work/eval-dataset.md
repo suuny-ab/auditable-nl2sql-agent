@@ -58,6 +58,6 @@
 - Python `3.13.12`：`python -m unittest discover -s api/tests -p "test_*.py" -v` 得到
   `Ran 33 tests`、`OK`；`compileall`、`pip check`、`git diff --check` 和变更文件公开内容扫描通过。
 - 本切片未调用 Provider、未计算任何指标、未增加依赖。
-  [Draft PR #5](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/5) 已创建；
-  [CI run 30690243508](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30690243508)
-  在 implementation SHA `33653d2` 上完成，结论为 `success`。
+  [PR #5](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/5) 已合并为 `01db420`；
+  [main CI run 30690523646](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30690523646)
+  在该 SHA 上完成，结论为 `success`。

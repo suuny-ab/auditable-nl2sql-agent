@@ -31,7 +31,7 @@ from .evidence import (
     bind_evidence,
     validate_result,
 )
-from .provider import SqlGenerationError, SqlGenerationResult
+from .provider import ProviderDecisionError, SqlGenerationError, SqlGenerationResult
 
 
 CANONICAL_QUESTION = "2026年第一季度非取消订单销售额是多少？"
@@ -43,9 +43,14 @@ CANONICAL_SQL = (
     "AND sales_order.order_date >= '2026-01-01' "
     "AND sales_order.order_date < '2026-04-01'"
 )
-RUN_RECORD_SCHEMA_VERSION = "run-record-v4"
+RUN_RECORD_SCHEMA_VERSION = "run-record-v5"
 DEFAULT_APPROVAL_ROW_LIMIT = 5
 DEFAULT_RESULT_ROW_LIMIT = 100
+_PROVIDER_TERMINAL_STATUSES = {
+    "block": "blocked",
+    "clarify": "clarification_required",
+    "no_answer": "no_answer",
+}
 
 
 class DuplicateRunError(ValueError):
@@ -102,6 +107,7 @@ class WorkflowState(TypedDict, total=False):
     run_id: str
     question: str
     schema_snapshot: list[dict[str, Any]]
+    provider_action: str | None
     generated_sql: str
     query_columns: list[str]
     query_rows: list[list[Any]]
@@ -307,6 +313,25 @@ def _build_graph(
                 code="unsupported_question",
                 message="question is outside the deterministic SQL stub",
             )
+        except ProviderDecisionError as exc:
+            terminal_status = _PROVIDER_TERMINAL_STATUSES[exc.action]
+            return {
+                "provider_action": exc.action,
+                "status": terminal_status,
+                "error_code": exc.code,
+                "error_message": str(exc),
+                "trajectory": [
+                    _event(
+                        state,
+                        node="draft_sql",
+                        status=terminal_status,
+                        details={
+                            "error_code": exc.code,
+                            "provider": exc.receipt,
+                        },
+                    )
+                ],
+            }
         except SqlGenerationError as exc:
             return _failure(
                 state,
@@ -327,9 +352,18 @@ def _build_graph(
                 message="SQL generator failed",
             )
         provider_receipt = None
+        provider_action = None
         if isinstance(generated, SqlGenerationResult):
             sql = generated.sql
             provider_receipt = generated.receipt
+            provider_action = generated.action
+            if provider_action not in {"query", "unsafe_operation"}:
+                return _failure(
+                    state,
+                    node="draft_sql",
+                    code="generator_error",
+                    message="SQL generator returned an unsupported executable action",
+                )
         else:
             sql = generated
         if not isinstance(sql, str) or not sql.strip():
@@ -343,6 +377,7 @@ def _build_graph(
         if provider_receipt is not None:
             details["provider"] = provider_receipt
         return {
+            "provider_action": provider_action,
             "generated_sql": sql,
             "status": "sql_ready",
             "trajectory": [
@@ -356,11 +391,19 @@ def _build_graph(
         }
 
     def assess_sql(state: WorkflowState) -> dict[str, Any]:
-        requirement = _approval_requirement(
-            business_database=business_database,
-            sql=state["generated_sql"],
-            row_limit=approval_row_limit,
-        )
+        if state.get("provider_action") == "unsafe_operation":
+            requirement = {
+                "reason": "unsafe_operation",
+                "threshold": approval_row_limit,
+                "requested_row_limit": None,
+                "can_execute": False,
+            }
+        else:
+            requirement = _approval_requirement(
+                business_database=business_database,
+                sql=state["generated_sql"],
+                row_limit=approval_row_limit,
+            )
         if requirement is None:
             return {
                 "approval_required": False,
@@ -658,7 +701,7 @@ def _build_graph(
         return "stop" if state["status"] == "failed" else "draft_sql"
 
     def after_draft(state: WorkflowState) -> str:
-        return "stop" if state["status"] == "failed" else "assess_sql"
+        return "assess_sql" if state["status"] == "sql_ready" else "stop"
 
     def after_assessment(state: WorkflowState) -> str:
         if state["status"] == "pending_approval":
@@ -904,6 +947,7 @@ class WorkflowRunner:
             "question": state["question"],
             "status": state["status"],
             "schema_snapshot": state.get("schema_snapshot", []),
+            "provider_action": state.get("provider_action"),
             "generated_sql": state.get("generated_sql"),
             "query_columns": state.get("query_columns", []),
             "query_rows": state.get("query_rows", []),

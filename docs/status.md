@@ -6,14 +6,14 @@
 | --- | --- |
 | `state` | `ready` |
 | 更新时间 | `2026-08-01` |
-| 最近完成 | `PROVIDER-DECISION-PROBE-011`：4 条固定案例精确区分歧义、无答案、越权操作和注入 |
-| 前序能力 | `DEEPSEEK-SQL-GENERATOR-010`：正式 Provider adapter、脱敏回执与失败关闭接入 |
-| 做什么 | 用 4 条固定问题验证候选五类 action；越权 SQL 只进入机械审批，不执行 |
-| 不做什么 | 不改产品代码或正式 prompt，不跑 20 条评测，不计算指标，不自动重试 |
-| 完成门 | 已满足：四类 action 4/4；越权审批不可执行；执行次数均为 0；usage 完整；业务库不变 |
-| 风险 | 脱敏回执仅在 Git 忽略目录；凭据、header 和原始响应未保存或提交 |
-| 项目基线 | 本地 `codex/provider-decision-probe@ed9c4b6`，基于 Draft PR #7 head |
-| 阻碍 | 无工程阻碍；本地探针回执尚未推送，且未获得本轮推送授权 |
+| 最近完成 | `PROVIDER-DECISION-CONTRACT-012`：五类严格 action、稳定终态与越权审批路由 |
+| 前序能力 | `PROVIDER-DECISION-PROBE-011`：4 条真实调用验证候选分类可分 |
+| 做什么 | 正式接入 `unsafe_operation`；投影 `provider_action`；固定三类无 SQL 终态 |
+| 不做什么 | 不调用真实 Provider，不跑 20 条评测或指标，不做 API/网页/Docker，不新增依赖 |
+| 完成门 | 已满足：五类严格 plan；三类稳定零执行终态；越权审批不可执行；43 项测试通过 |
+| 风险 | `run-record-v5` 已版本化决策字段；模型 action 与 SQLite 机械只读边界均有独立回归测试 |
+| 项目基线 | 本地 `codex/provider-decision-contract`；切片起点 `852dca7`，包含 Draft PR #7 与决策探针提交 |
+| 阻碍 | 无工程阻碍；本地提交尚未推送，且本轮没有远端写入授权 |
 
 ## 复用审查
 
@@ -128,6 +128,18 @@
   正式 prompt、依赖、评测运行器或指标口径。完整边界见
   [`docs/work/provider-decision-probe.md`](work/provider-decision-probe.md)。
 
+## PROVIDER-DECISION-CONTRACT-012 验证证据
+
+- 严格 plan 已支持 `query`、`unsafe_operation`、`clarify`、`no_answer`、`block`；SQL 是否必填由
+  action 精确约束，未知 action 和字段漂移失败关闭。
+- `run-record-v5` 投影 `provider_action`；三类无 SQL 决策得到 `clarification_required`、
+  `no_answer`、`blocked` 稳定终态，执行次数为 0，且不产生 approval/evidence/answer。
+- `unsafe_operation` action 自身强制进入 `reason=unsafe_operation`、`can_execute=false` 的审批；
+  模拟批准后仍执行 0 次。反向错标为 `query` 的删除 SQL 仍由机械只读校验独立阻断。
+- Python `3.13.12` Provider 定向 10 项、全量 43 项测试通过；编译、依赖、差异、凭据模式、
+  `.local` 跟踪和产品依赖方向检查通过。本轮真实 Provider 调用与 token 消耗均为 0。完整合同见
+  [`docs/work/provider-decision-contract.md`](work/provider-decision-contract.md)。
+
 
 ## EVAL-DATASET-008 验证证据
 
@@ -174,10 +186,9 @@
 
 ## 下一候选
 
-下一步候选是正式 Provider 决策终态合同：把 `unsafe_operation` 纳入严格 plan，并把
-`clarify`、`no_answer`、`block` 映射为可供评测器直接判定的稳定终态；越权 SQL 只进入
-`can_execute=false` 的现有审批路径。该切片不调用完整 20 条评测、不计算指标、不改 API/网页。
-候选语义已经由 4 条真实调用排除最小风险，完成正式合同后再做模型评测运行器。
+下一步候选是模型评测运行器：读取已冻结的 20 条合成案例，显式启用 Provider，每条固定一次且
+不自动重试，保存结构化 trajectory 与脱敏 usage，并计算执行成功率、答案正确率、人工介入率。
+该切片不改产品决策合同、API/网页/Docker；真实调用、费用和凭据使用须在开工当轮单独确认。
 
 ## 审批中断/恢复最小风险探针
 

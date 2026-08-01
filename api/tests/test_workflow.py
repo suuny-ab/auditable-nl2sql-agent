@@ -82,7 +82,7 @@ class WorkflowRunnerTests(unittest.TestCase):
                 question=CANONICAL_QUESTION,
             )
 
-        self.assertEqual(record["schema_version"], "run-record-v4")
+        self.assertEqual(record["schema_version"], "run-record-v5")
         self.assertEqual(record["status"], "completed")
         self.assertEqual(record["query_columns"], ["revenue"])
         self.assertEqual(record["query_rows"], [[5946.0]])

@@ -25,7 +25,7 @@
 - 不把模型输出直连 SQLite，不让人工批准绕过只读边界。
 - 不提交 API key、Authorization header、原始 HTTP 请求/响应或隐藏思维内容。
 - 不在代码中增加预算、余额、自动停用或费用限制逻辑。
-- 本轮只本地提交探针回执，不推送探针分支。
+- 不合并 PR，不把 Draft PR 转为 Ready；外部发布只到用户当次授权的探针分支和 Draft PR。
 
 ## 怎样算完成
 
@@ -72,3 +72,6 @@
   `present=true`，不含 key、Authorization header、原始 HTTP 包或隐藏思维。
 - Python `3.13.12` 全量产品与合同测试 33 项通过；`compileall`、`pip check`、
   `git diff --check` 和 tracked secret pattern scan 通过。产品代码、依赖和 CI 均未修改。
+- [Draft PR #6](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/6) 已创建；
+  [CI run 30691303286](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30691303286)
+  在 implementation SHA `aca0759` 上完成，结论为 `success`。

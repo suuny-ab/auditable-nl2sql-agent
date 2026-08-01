@@ -12,8 +12,8 @@
 | 不做什么 | 不改正式 Provider/工作流/依赖，不跑 20 条评测，不计算指标，不加入代码层费用限制 |
 | 完成门 | 3 次接口与 JSON 通过；2 条成功结果命中 gold；越权不执行；畸形响应拒绝；业务库不变 |
 | 风险 | 6 次 DeepSeek 调用回执仅在 `.local/`；凭据未输出或落盘；正式 Provider 仍默认关闭 |
-| 项目基线 | `main@0f19712`；本地分支 `codex/deepseek-provider-probe` |
-| 阻碍 | 无工程阻碍 |
+| 项目基线 | Draft PR #6：`codex/deepseek-provider-probe` → `main@0f19712` |
+| 阻碍 | 无工程阻碍；PR #6 等待评审，implementation SHA `aca0759` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -90,6 +90,9 @@
 - Python `3.13.12` 全量产品与合同测试 33 项通过；`compileall`、`pip check`、
   `git diff --check` 和 tracked secret pattern scan 通过。完整合同见
   [`docs/work/deepseek-provider-probe.md`](work/deepseek-provider-probe.md)。
+- [Draft PR #6](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/6) 已创建；
+  [CI run 30691303286](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30691303286)
+  在 implementation SHA `aca0759` 上完成，结论为 `success`。
 
 ## EVAL-DATASET-008 验证证据
 

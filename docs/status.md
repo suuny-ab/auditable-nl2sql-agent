@@ -7,13 +7,14 @@
 | `state` | `ready` |
 | 更新时间 | `2026-08-01` |
 | 最近完成 | `APPROVAL-GATE-004`：机械 SQL 审批分类、真实中断恢复、决定幂等与不可绕过只读边界 |
+| 最近验证 | `EVIDENCE-FINGERPRINT-PROBE-005`：规范 JSON、跨进程 SHA-256 与非法输入失败关闭 |
 | 前序能力 | `WORKFLOW-CORE-002`：离线 LangGraph 状态机、独立 checkpoint、稳定 trajectory 与失败终态 |
 | 做什么 | 高行数和写操作 SQL 在执行前持久化挂起；同一 run ID 可跨进程批准或拒绝 |
 | 不做什么 | 未接 LLM、真实身份权限、自动重试、FastAPI、网页、Docker、Postgres 或完整评测 |
 | 完成门 | 普通查询直通；高行数批准只执行一次；拒绝和写操作批准不执行；重复决定显式失败；业务库不变 |
 | 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | 本地与远端分支 `codex/approval-gate` 基于已合并并通过 CI 的 `origin/main@63381f9` |
-| 阻碍 | 无工程阻碍；Draft PR #2 已打开且 CI 通过，尚未授权合并 |
+| 项目基线 | 本地分支 `codex/evidence-fingerprint-probe` 基于已合并并通过 CI 的 `origin/main@d7be385` |
+| 阻碍 | 无工程阻碍；证据指纹风险已排除，正式 evidence 切片尚未开工 |
 
 ## 复用审查
 
@@ -51,14 +52,25 @@
 - 写 SQL 的审批状态固定 `can_execute=false`；即使批准也以
   `approval_cannot_override_read_only` 结束，执行尝试为 0，业务库哈希不变。
 - 当前全量测试为 20 项本地通过；完整合同见
-  [`docs/work/approval-gate.md`](work/approval-gate.md)。候选已进入
-  [Draft PR #2](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/2)，当前 HEAD 的远端 CI
-  结论为 `success`，PR 未获得合并授权。
+  [`docs/work/approval-gate.md`](work/approval-gate.md)。[PR #2](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/2)
+  已合并为 `d7be385`；
+  [main CI run 30685924831](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30685924831)
+  在该 SHA 上完成，结论为 `success`。
+
+## EVIDENCE-FINGERPRINT-PROBE-005 验证证据
+
+- 两个独立 Python 进程对不同字典插入顺序的同一 evidence 得到相同的 2932 字节规范 JSON 和
+  SHA-256 `b5522364…60dc`。
+- SQL、schema、结果三类单字段变化全部产生不同指纹；截断、行宽错误、`NaN`、`bytes` 四类
+  非法输入全部拒绝。
+- 最终 7 项机器断言全部通过，业务库 SHA-256 始终为 `564572c5…1ea7`；未修改产品代码或依赖。
+- 完整合同、指纹和声明边界见
+  [`docs/work/evidence-fingerprint-probe.md`](work/evidence-fingerprint-probe.md)。
 
 ## 下一候选
 
 下一切片候选是结果校验与证据绑定：把 SQL、schema 快照、结果行和校验结论绑定为稳定证据
-对象，但仍不接真实 LLM、FastAPI、网页或完整评测。
+对象。指纹技术风险已由最小探针排除；仍不接真实 LLM、FastAPI、网页或完整评测。
 
 ## 审批中断/恢复最小风险探针
 

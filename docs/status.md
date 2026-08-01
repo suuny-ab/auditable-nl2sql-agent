@@ -6,14 +6,14 @@
 | --- | --- |
 | `state` | `ready` |
 | 更新时间 | `2026-08-01` |
-| 最近完成 | `EVAL-DATASET-008`：冻结 20 条 `8/3/3/3/3` 合成 gold contract 并复算参考 SQL |
-| 前序能力 | `EVIDENCE-ANSWER-007`：由完整 evidence 生成带精确来源的确定性 `answer-v1` |
-| 做什么 | 固定问题、类别、参考 SQL/空值、终态、审批和结果，并机器校验 gold contract |
-| 不做什么 | 未调用模型、未计算指标、未调提示词、未改工作流、FastAPI、网页或 Docker |
-| 完成门 | 20 条和 ID 固定；成功/越权参考 SQL 路由与结果一致；非执行类别合同明确；业务库不变 |
-| 风险 | 产品运行保持本地合成数据、无 Provider/费用；开发安装只读取公开包索引，无账号或业务写入 |
-| 项目基线 | `main@01db420`：PR #5 已合并，merge commit 远端 CI 通过 |
-| 阻碍 | 无工程阻碍 |
+| 最近完成 | `DEEPSEEK-PROVIDER-PROBE-009`：3 条固定案例的 JSON SQL 输出与安全路由探针通过 |
+| 前序能力 | `EVAL-DATASET-008`：冻结 20 条 `8/3/3/3/3` 合成 gold contract 并复算参考 SQL |
+| 做什么 | 调用 3 条固定案例；严格解析 JSON；SQL 只经现有工作流；记录 usage 与数据库哈希 |
+| 不做什么 | 不改正式 Provider/工作流/依赖，不跑 20 条评测，不计算指标，不加入代码层费用限制 |
+| 完成门 | 3 次接口与 JSON 通过；2 条成功结果命中 gold；越权不执行；畸形响应拒绝；业务库不变 |
+| 风险 | 6 次 DeepSeek 调用回执仅在 `.local/`；凭据未输出或落盘；正式 Provider 仍默认关闭 |
+| 项目基线 | Draft PR #6：`codex/deepseek-provider-probe` → `main@0f19712` |
+| 阻碍 | 无工程阻碍；PR #6 等待评审，implementation SHA `aca0759` 的远端 CI 已通过 |
 
 ## 复用审查
 
@@ -77,6 +77,23 @@
   [main CI run 30688678078](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30688678078)
   在该 SHA 上完成，结论为 `success`。
 
+## DEEPSEEK-PROVIDER-PROBE-009 验证证据
+
+- `deepseek-v4-flash` 两轮各调用同一 3 条冻结案例，6 次响应均为 HTTP 200、
+  `finish_reason=stop` 和严格 JSON；未自动重试。
+- 首轮两条成功 SQL 的数值结果命中 gold，但列别名不稳定，因此首轮为 `FAIL`；加入显式
+  `required_output_columns` 后复验为 `PASS`，两条成功结果的列、行和截断状态全部命中 gold。
+- 删除请求由模型返回 `action=block`、`sql=null`，执行尝试为 0；本地畸形响应被严格解析器拒绝。
+- 两轮合计 prompt `5051`、completion `529`、total `5580` tokens；代码层未增加费用限制。
+- 两轮每个案例前后的业务库 SHA-256 均为 `564572c…1ea7`；key、Authorization header 和原始
+  HTTP 包均未落盘，脱敏回执保存在 Git 忽略目录。
+- Python `3.13.12` 全量产品与合同测试 33 项通过；`compileall`、`pip check`、
+  `git diff --check` 和 tracked secret pattern scan 通过。完整合同见
+  [`docs/work/deepseek-provider-probe.md`](work/deepseek-provider-probe.md)。
+- [Draft PR #6](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/6) 已创建；
+  [CI run 30691303286](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30691303286)
+  在 implementation SHA `aca0759` 上完成，结论为 `success`。
+
 ## EVAL-DATASET-008 验证证据
 
 - `evals/cases.jsonl` 恰好 20 条，固定 ID 与分类为成功 8、歧义 3、无答案 3、越权 3、注入 3；
@@ -122,8 +139,10 @@
 
 ## 下一候选
 
-下一步候选是 DeepSeek 最小 Provider 探针：仅在 Git 忽略目录验证凭据、兼容接口、结构化 SQL
-输出与少量固定案例，不修改产品代码。该动作会产生外部调用和费用，必须另获当次授权。
+下一步候选是正式 DeepSeek SQL generator 的最小产品切片：只增加一个默认禁用的 Provider
+适配器、严格结构化解析和失败关闭测试，接入现有 `WorkflowRunner`；不跑 20 条评测、不计算
+指标、不做 FastAPI 或网页。探针已经排除当前凭据、接口、JSON 输出、稳定列名合同和机械安全
+路由的最小风险。
 
 ## 审批中断/恢复最小风险探针
 

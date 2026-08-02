@@ -123,7 +123,11 @@ def load_canonical_facts(root: Path) -> CanonicalFacts:
             "canonical_full_test_count_missing",
         ).group(1)
     )
-    if "网页和服务器部署仍待实现" not in project:
+    if "本地静态展示页已可运行" in project:
+        web_available = True
+    elif "网页和服务器部署仍待实现" in project:
+        web_available = False
+    else:
         raise ValueError("canonical_web_availability_missing")
     if "只用合成数据" not in project:
         raise ValueError("canonical_data_boundary_missing")
@@ -135,7 +139,7 @@ def load_canonical_facts(root: Path) -> CanonicalFacts:
         current_slice=current_slice,
         main_sha=main_sha,
         full_test_count=full_test_count,
-        web_available=False,
+        web_available=web_available,
         synthetic_data_only=True,
         provider_default_enabled=False,
     )
@@ -245,6 +249,20 @@ def _line_findings(
             relative,
             line_number,
             "current runnable web claim conflicts with PROJECT.md",
+        )
+
+    current_web_unavailable = re.search(
+        r"(?:当前|目前|现在|现行).{0,24}网页.{0,16}(?:没有可运行|尚未实现|仍待实现)|"
+        r"网页.{0,24}(?:当前|目前|现在|现行).{0,16}(?:没有可运行|尚未实现|仍待实现)",
+        line,
+    )
+    if not historical and current_web_unavailable and facts.web_available:
+        yield Finding(
+            "stale",
+            "current_web_availability_conflict",
+            relative,
+            line_number,
+            "current unavailable web claim conflicts with PROJECT.md",
         )
 
     current_real_data = re.search(

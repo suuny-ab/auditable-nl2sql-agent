@@ -1,0 +1,153 @@
+{
+  "schema_version": "showcase-replay-v1",
+  "source": {
+    "run_record_schema": "run-record-v5",
+    "run_id": "container-demo-run",
+    "public_read_url": "https://47.84.34.86/nl2sql/api/v1/runs/container-demo-run",
+    "public_health_url": "https://47.84.34.86/nl2sql/api/v1/health",
+    "fixture_factory": "deploy/create_synthetic_fixture.py",
+    "verified_date": "2026-08-02",
+    "data_class": "synthetic_ecommerce"
+  },
+  "record": {
+    "run_id": "container-demo-run",
+    "question": "2026年第一季度非取消订单销售额是多少？",
+    "status": "completed",
+    "provider_action": null,
+    "generated_sql": "SELECT ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) WHERE sales_order.status != 'cancelled' AND sales_order.order_date >= '2026-01-01' AND sales_order.order_date < '2026-04-01'",
+    "query_columns": [
+      "revenue"
+    ],
+    "query_rows": [
+      [
+        5946.0
+      ]
+    ],
+    "truncated": false,
+    "result_row_limit": 100,
+    "result_validation": {
+      "status": "passed",
+      "returned_row_count": 1,
+      "checks": [
+        {
+          "name": "columns_present",
+          "passed": true
+        },
+        {
+          "name": "rows_are_lists",
+          "passed": true
+        },
+        {
+          "name": "row_width_matches_columns",
+          "passed": true
+        },
+        {
+          "name": "not_truncated",
+          "passed": true
+        },
+        {
+          "name": "json_scalars_only",
+          "passed": true
+        }
+      ]
+    },
+    "evidence": {
+      "schema_version": "evidence-v1",
+      "fingerprint": {
+        "algorithm": "sha256",
+        "canonicalization": "canonical-json-v1",
+        "value": "df7e6219cddf5152d66ad43d490955d928840b883f3db7ad48832d94c5f53499"
+      }
+    },
+    "answer": {
+      "schema_version": "answer-v1",
+      "text": "查询结果：revenue = 5946.0。",
+      "source": {
+        "evidence_schema_version": "evidence-v1",
+        "evidence_fingerprint": "df7e6219cddf5152d66ad43d490955d928840b883f3db7ad48832d94c5f53499",
+        "references": [
+          {
+            "kind": "result_cell",
+            "path": "payload.result.rows[0][0]",
+            "row_index": 0,
+            "column": "revenue",
+            "value": 5946.0
+          }
+        ]
+      }
+    },
+    "attempt_count": 1,
+    "approval": null,
+    "trajectory": [
+      {
+        "sequence": 1,
+        "node": "load_schema",
+        "status": "completed",
+        "details": {
+          "table_count": 4
+        }
+      },
+      {
+        "sequence": 2,
+        "node": "draft_sql",
+        "status": "completed",
+        "details": {
+          "sql": "SELECT ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) WHERE sales_order.status != 'cancelled' AND sales_order.order_date >= '2026-01-01' AND sales_order.order_date < '2026-04-01'"
+        }
+      },
+      {
+        "sequence": 3,
+        "node": "assess_sql",
+        "status": "completed",
+        "details": {
+          "approval_required": false
+        }
+      },
+      {
+        "sequence": 4,
+        "node": "execute_sql",
+        "status": "completed",
+        "details": {
+          "returned_row_count": 1,
+          "truncated": false
+        }
+      },
+      {
+        "sequence": 5,
+        "node": "validate_result",
+        "status": "completed",
+        "details": {
+          "returned_row_count": 1
+        }
+      },
+      {
+        "sequence": 6,
+        "node": "bind_evidence",
+        "status": "completed",
+        "details": {
+          "schema_version": "evidence-v1",
+          "fingerprint": "df7e6219cddf5152d66ad43d490955d928840b883f3db7ad48832d94c5f53499"
+        }
+      },
+      {
+        "sequence": 7,
+        "node": "compose_answer",
+        "status": "completed",
+        "details": {
+          "schema_version": "answer-v1",
+          "source_count": 1
+        }
+      },
+      {
+        "sequence": 8,
+        "node": "finish",
+        "status": "completed",
+        "details": {
+          "result_available": true,
+          "answer_available": true
+        }
+      }
+    ],
+    "checkpoint_count": 10
+  }
+}

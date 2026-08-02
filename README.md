@@ -12,7 +12,8 @@
 首次 20 条固定模型基线为执行成功率 `7/8`、答案正确率 `14/20`、人工介入率 `7/20`；加入最小
 业务知识层后的唯一复跑为 `8/8`、`15/20`、`7/20`。这是同一冻结合成集上的前后对比，不是独立
 未见集，也不构成泛化提升或生产稳定性主张。FastAPI 只读服务已提供 health、任务摘要列表和
-完整 run/trajectory 回查，并可由 Docker Compose 启动固定合成演示；网页仍待实现。当前回答是
+完整 run/trajectory 回查，并可由 Docker Compose 启动固定合成演示。当前网页可在 `web/` 本地
+运行，静态回放公开 `container-demo-run` 的 SQL、结果、证据与回答；页面尚未部署。当前回答是
 确定性结果投影，
 不是 LLM 自由回答；SHA-256 用于稳定绑定和变化检测，不是数字签名，也不证明 SQL 或答案的业务
 语义正确。
@@ -28,7 +29,7 @@ SQL generator 还会从两份版本化合成知识文件中按问题匹配业务
 api/       Python 产品代码与测试
 docs/      当前状态和有界切片合同
 evals/     20 条固定合成评测合同与机器校验
-web/       最小任务/轨迹页面（待实现）
+web/       本地静态项目展示与真实 run 回放（未部署）
 deploy/    Docker 构建、固定合成 fixture 与部署边界说明
 ```
 
@@ -61,6 +62,17 @@ $env:PYTHONPATH = "api/src"
 安装项目后也可使用等价入口 `auditable-nl2sql-api`。启动成功后，
 `GET http://127.0.0.1:8000/api/v1/health` 返回服务版本和 `read_only=true`；服务不提供 run 创建或
 审批接口。
+
+## 启动本地展示页
+
+```powershell
+Set-Location web
+npm install
+npm run dev
+```
+
+页面只展示版本化回放，不会创建 run 或调用 Provider；构建与回放来源见
+[`web/README.md`](web/README.md)。
 
 ## 从克隆到 Docker 启动
 

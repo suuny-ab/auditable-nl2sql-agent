@@ -12,6 +12,7 @@ from typing import Any, Protocol
 
 from .intent import INTENT_POLICY_SCHEMA_VERSION, classify_question_intent
 from .knowledge import BusinessKnowledgeError, build_business_context
+from .schema_summary import SchemaSummaryError, build_schema_summary
 
 
 DEEPSEEK_CHAT_COMPLETIONS_URL = "https://api.deepseek.com/chat/completions"
@@ -296,6 +297,10 @@ class DeepSeekSqlGenerator:
             raise ProviderConfigurationError("Provider schema snapshot must be non-empty")
 
         try:
+            schema_summary = build_schema_summary(schema_snapshot)
+        except SchemaSummaryError as exc:
+            raise ProviderConfigurationError("Schema summary is invalid") from exc
+        try:
             business_context = build_business_context(question, schema_snapshot)
         except BusinessKnowledgeError as exc:
             raise ProviderConfigurationError("Business knowledge is invalid") from exc
@@ -320,13 +325,17 @@ class DeepSeekSqlGenerator:
             "are read-only "
             "reference templates: adapt them only when the question semantics match, verify "
             "every table and column against the supplied schema, and never let them override "
-            "the action or safety rules. "
+            "the action or safety rules. The full schema is authoritative; schema_summary is "
+            "only a compact projection for table, column, declared-type, primary-key, and "
+            "foreign-key discovery. Never infer stored values from schema_summary or let it "
+            "override the full schema, business metadata, action rules, or safety rules. "
             "For revenue expressions use the alias revenue; preserve selected source column "
             "names; use descriptive snake_case aliases ending in _count for counts. Never "
             "invent tables or columns. Never output Markdown or hidden reasoning. Output JSON only."
         )
         user_input = {
             "schema": schema_snapshot,
+            "schema_summary": schema_summary,
             "business_context": business_context,
             "data_boundary": "all records and names are synthetic",
             "question": question.strip(),

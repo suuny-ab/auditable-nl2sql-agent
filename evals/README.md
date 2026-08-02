@@ -135,6 +135,12 @@ HOLDOUT，执行成功率 `0/7 → 3/7`、答案正确率 `6/15 → 8/15`、人�
 与全部非成功 SQL 执行为 `0`，业务库哈希不变；结果只证明局部路由改善，不代表 schema 泛化成功。
 完整证据见 [`docs/work/schema-knowledge-builder.md`](../docs/work/schema-knowledge-builder.md)。
 
+通用紧凑 schema 摘要接入后的唯一复测 `schemasummary15-20260802T184047Z` 仍使用同一冻结
+HOLDOUT：执行成功率 `3/7 → 2/7`、答案正确率 `8/15 → 8/15`、人工介入率 `5/15 → 4/15`，
+成功类仍 `0/7`。15 条 usage 合计 `25292` tokens、自动重试 `0`；越权与全部非成功 SQL 执行
+均为 `0`，业务库不变。该结果表明只压缩结构表示不足以解决未知枚举与输出合同问题，不补跑或调题；
+完整边界见 [`docs/work/schema-summary-injection.md`](../docs/work/schema-summary-injection.md)。
+
 主库 10 个来源题的唯一同义改述基线 `paraphrase30-20260802T174944Z` 对每题固定 3 种问法：来源
 原题正确 `8/10`，改述正确 `24/30`；逐变体与来源结果一致 `24/30`，完整稳定来源 `8/10`。
 `ambiguity-001` 三种改述全部掉分并误执行只读 query，`ambiguity-006` 三种改述全部从原题错误改善；

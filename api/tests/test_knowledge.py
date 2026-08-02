@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import tempfile
 import unittest
 from pathlib import Path
 
 from auditable_nl2sql import (
     BUSINESS_CONTEXT_SCHEMA_VERSION,
+    TRAINING_PAIR_MAX_MATCHES,
+    TRAINING_PAIR_SIMILARITY_THRESHOLD,
     build_business_context,
     load_business_knowledge,
     read_schema,
+    retrieve_training_examples,
 )
 from auditable_nl2sql.demo import create_demo_database
+from evals.contract import load_cases, validate_case_contract
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _schema_snapshot(database_path: Path) -> list[dict[str, object]]:
@@ -74,6 +82,52 @@ class BusinessKnowledgeTests(unittest.TestCase):
             self.assertTrue(term.definition)
             self.assertTrue(set(term.related_fields) <= described_fields)
 
+    def test_training_pairs_match_all_frozen_success_cases(self) -> None:
+        cases = load_cases(PROJECT_ROOT / "evals/cases.jsonl")
+        validate_case_contract(cases)
+        expected = [
+            (case["case_id"], case["question"], case["reference_sql"])
+            for case in cases
+            if case["category"] == "success"
+        ]
+        actual = [
+            (pair.source_case_id, pair.question, pair.sql)
+            for pair in load_business_knowledge().training_pairs
+        ]
+
+        self.assertEqual(actual, expected)
+        self.assertTrue(
+            all(pair.enabled for pair in load_business_knowledge().training_pairs)
+        )
+
+    def test_similar_question_recalls_enabled_training_pair(self) -> None:
+        examples = retrieve_training_examples(
+            "2026年第一季度非取消订单的销售额是多少？"
+        )
+
+        self.assertLessEqual(len(examples), TRAINING_PAIR_MAX_MATCHES)
+        self.assertEqual(examples[0]["source_case_id"], "success-001")
+        self.assertGreaterEqual(
+            examples[0]["similarity"],
+            TRAINING_PAIR_SIMILARITY_THRESHOLD,
+        )
+        self.assertLess(examples[0]["similarity"], 1.0)
+
+    def test_unrelated_question_does_not_recall_training_pair(self) -> None:
+        self.assertEqual(retrieve_training_examples("明天会下雨吗？"), [])
+
+    def test_disabled_training_pair_is_not_recalled(self) -> None:
+        enabled = load_business_knowledge().training_pairs[0]
+        disabled = replace(enabled, enabled=False)
+
+        self.assertEqual(
+            retrieve_training_examples(
+                enabled.question,
+                training_pairs=(disabled,),
+            ),
+            [],
+        )
+
     def test_matches_terms_and_injects_only_related_available_field_notes(self) -> None:
         context = build_business_context(
             "按有效订单的营收统计下单渠道。",
@@ -110,9 +164,10 @@ class BusinessKnowledgeTests(unittest.TestCase):
         self.assertEqual(
             context,
             {
-                "schema_version": "business-context-v1",
+                "schema_version": "business-context-v2",
                 "matched_terms": [],
                 "field_notes": [],
+                "training_examples": [],
             },
         )
 

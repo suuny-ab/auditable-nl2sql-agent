@@ -188,7 +188,7 @@ class ProviderContractTests(unittest.TestCase):
         user_content = transport.calls[0]["messages"][1]["content"]
         request_input = json.loads(user_content.split("\n", maxsplit=1)[1])
         context = request_input["business_context"]
-        self.assertEqual(context["schema_version"], "business-context-v1")
+        self.assertEqual(context["schema_version"], "business-context-v2")
         self.assertEqual(
             [term["term"] for term in context["matched_terms"]],
             ["销售额", "非取消订单", "订单", "销售渠道"],
@@ -205,7 +205,27 @@ class ProviderContractTests(unittest.TestCase):
             ],
         )
         self.assertNotIn("客户分群", user_content)
+        self.assertEqual(context["training_examples"], [])
         self.assertEqual(request_input["data_boundary"], "all records and names are synthetic")
+
+    def test_request_injects_similar_training_pair_as_bounded_reference(self) -> None:
+        transport = FakeTransport(_response())
+        generator = DeepSeekSqlGenerator(enabled=True, transport=transport)
+
+        generator.generate(
+            "2026年第一季度非取消订单的销售额是多少？",
+            _knowledge_schema(),
+        )
+
+        system_prompt = transport.calls[0]["messages"][0]["content"]
+        user_content = transport.calls[0]["messages"][1]["content"]
+        request_input = json.loads(user_content.split("\n", maxsplit=1)[1])
+        examples = request_input["business_context"]["training_examples"]
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(examples[0]["source_case_id"], "success-001")
+        self.assertEqual(examples[0]["sql"], CANONICAL_SQL)
+        self.assertIn("read-only reference templates", system_prompt)
+        self.assertIn("never let them override", system_prompt)
 
     def test_non_query_decisions_fail_closed_with_stable_codes(self) -> None:
         expected_codes = {

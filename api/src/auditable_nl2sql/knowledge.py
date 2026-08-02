@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
@@ -10,12 +11,18 @@ from importlib import resources
 from typing import Any
 
 
-BUSINESS_CONTEXT_SCHEMA_VERSION = "business-context-v1"
+BUSINESS_CONTEXT_SCHEMA_VERSION = "business-context-v2"
 BUSINESS_TERMS_SCHEMA_VERSION = "business-terms-v1"
 FIELD_DESCRIPTIONS_SCHEMA_VERSION = "field-descriptions-v1"
+TRAINING_PAIRS_SCHEMA_VERSION = "training-pairs-v1"
+TRAINING_PAIR_SIMILARITY_ALGORITHM = "normalized-character-bigram-jaccard-v1"
+TRAINING_PAIR_SIMILARITY_THRESHOLD = 0.72
+TRAINING_PAIR_MAX_MATCHES = 2
 _TERM_KEYS = {"term", "synonyms", "definition", "related_fields"}
 _TABLE_KEYS = {"name", "description", "fields"}
 _FIELD_KEYS = {"name", "description"}
+_SIMILARITY_KEYS = {"algorithm", "threshold", "max_matches"}
+_TRAINING_PAIR_KEYS = {"source_case_id", "question", "sql", "enabled"}
 
 
 class BusinessKnowledgeError(ValueError):
@@ -43,9 +50,18 @@ class FieldDescription:
 
 
 @dataclass(frozen=True)
+class TrainingPair:
+    source_case_id: str
+    question: str
+    sql: str
+    enabled: bool
+
+
+@dataclass(frozen=True)
 class BusinessKnowledge:
     terms: tuple[BusinessTerm, ...]
     field_descriptions: tuple[FieldDescription, ...]
+    training_pairs: tuple[TrainingPair, ...]
 
 
 def _reject_json_constant(value: str) -> None:
@@ -200,9 +216,74 @@ def load_business_knowledge() -> BusinessKnowledge:
         raise BusinessKnowledgeError(
             f"Business terms reference unknown fields: {unknown_references}"
         )
+
+    training_payload = _require_keys(
+        _read_resource("training_pairs.json"),
+        {"schema_version", "similarity", "pairs"},
+        "training pairs root",
+    )
+    if training_payload["schema_version"] != TRAINING_PAIRS_SCHEMA_VERSION:
+        raise BusinessKnowledgeError("Unsupported training pairs schema version")
+    similarity = _require_keys(
+        training_payload["similarity"],
+        _SIMILARITY_KEYS,
+        "training pairs similarity",
+    )
+    if similarity != {
+        "algorithm": TRAINING_PAIR_SIMILARITY_ALGORITHM,
+        "threshold": TRAINING_PAIR_SIMILARITY_THRESHOLD,
+        "max_matches": TRAINING_PAIR_MAX_MATCHES,
+    }:
+        raise BusinessKnowledgeError("Training pair similarity contract changed")
+    raw_pairs = training_payload["pairs"]
+    if not isinstance(raw_pairs, list) or len(raw_pairs) != 8:
+        raise BusinessKnowledgeError("Training pairs must contain exactly 8 entries")
+
+    training_pairs: list[TrainingPair] = []
+    source_case_ids: set[str] = set()
+    training_questions: set[str] = set()
+    for index, raw_pair in enumerate(raw_pairs):
+        pair_data = _require_keys(
+            raw_pair,
+            _TRAINING_PAIR_KEYS,
+            f"training_pair[{index}]",
+        )
+        source_case_id = _require_text(
+            pair_data["source_case_id"],
+            f"training_pair[{index}].source_case_id",
+        )
+        question = _require_text(
+            pair_data["question"],
+            f"training_pair[{index}].question",
+        )
+        sql = _require_text(pair_data["sql"], f"training_pair[{index}].sql")
+        enabled = pair_data["enabled"]
+        if re.fullmatch(r"success-\d{3}", source_case_id) is None:
+            raise BusinessKnowledgeError("Training pair source must be a success case")
+        if type(enabled) is not bool:
+            raise BusinessKnowledgeError("Training pair enabled flag must be boolean")
+        if not sql.casefold().startswith("select "):
+            raise BusinessKnowledgeError("Training pair SQL must be read-only SELECT")
+        if source_case_id in source_case_ids:
+            raise BusinessKnowledgeError("Training pair source case IDs must be unique")
+        if question in training_questions:
+            raise BusinessKnowledgeError("Training pair questions must be unique")
+        source_case_ids.add(source_case_id)
+        training_questions.add(question)
+        training_pairs.append(
+            TrainingPair(
+                source_case_id=source_case_id,
+                question=question,
+                sql=sql,
+                enabled=enabled,
+            )
+        )
+    if source_case_ids != {f"success-{index:03d}" for index in range(1, 9)}:
+        raise BusinessKnowledgeError("Training pairs must cover success-001 through 008")
     return BusinessKnowledge(
         terms=tuple(terms),
         field_descriptions=tuple(descriptions),
+        training_pairs=tuple(training_pairs),
     )
 
 
@@ -221,6 +302,65 @@ def _available_field_references(schema_snapshot: list[dict[str, Any]]) -> set[st
             column_name = _require_text(column.get("name"), "schema column name")
             available.add(f"{table_name}.{column_name}")
     return available
+
+
+def _character_bigrams(value: str) -> frozenset[str]:
+    normalized = "".join(
+        character
+        for character in _require_text(value, "question").casefold()
+        if character.isalnum()
+    )
+    if not normalized:
+        return frozenset()
+    if len(normalized) == 1:
+        return frozenset({normalized})
+    return frozenset(
+        normalized[index : index + 2]
+        for index in range(len(normalized) - 1)
+    )
+
+
+def _bigram_jaccard(left: frozenset[str], right: frozenset[str]) -> float:
+    if not left or not right:
+        return 0.0
+    return len(left & right) / len(left | right)
+
+
+def retrieve_training_examples(
+    question: str,
+    *,
+    training_pairs: tuple[TrainingPair, ...] | None = None,
+) -> list[dict[str, Any]]:
+    """Return a stable, bounded list of enabled similar training pairs."""
+
+    pairs = (
+        load_business_knowledge().training_pairs
+        if training_pairs is None
+        else training_pairs
+    )
+    question_bigrams = _character_bigrams(question)
+    matches: list[tuple[float, TrainingPair]] = []
+    for pair in pairs:
+        if not isinstance(pair, TrainingPair):
+            raise BusinessKnowledgeError("Training pair collection is invalid")
+        if not pair.enabled:
+            continue
+        similarity = _bigram_jaccard(
+            question_bigrams,
+            _character_bigrams(pair.question),
+        )
+        if similarity >= TRAINING_PAIR_SIMILARITY_THRESHOLD:
+            matches.append((similarity, pair))
+    matches.sort(key=lambda item: (-item[0], item[1].source_case_id))
+    return [
+        {
+            "source_case_id": pair.source_case_id,
+            "question": pair.question,
+            "sql": pair.sql,
+            "similarity": round(similarity, 4),
+        }
+        for similarity, pair in matches[:TRAINING_PAIR_MAX_MATCHES]
+    ]
 
 
 def build_business_context(
@@ -271,4 +411,8 @@ def build_business_context(
         "schema_version": BUSINESS_CONTEXT_SCHEMA_VERSION,
         "matched_terms": matched_terms,
         "field_notes": field_notes,
+        "training_examples": retrieve_training_examples(
+            question,
+            training_pairs=knowledge.training_pairs,
+        ),
     }

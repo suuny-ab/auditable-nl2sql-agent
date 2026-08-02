@@ -32,13 +32,25 @@ ORIGINAL_CASE_IDS = frozenset(
 ORIGINAL_CASES_CANONICAL_SHA256 = (
     "773d0eaeb83060e40b3fd8119ac4738f5b494a8030f8d5d9659c71c57b5864e4"
 )
+PREVIOUS_THIRTY_CASE_IDS = frozenset(
+    {
+        *(f"success-{index:03d}" for index in range(1, 13)),
+        *(f"ambiguity-{index:03d}" for index in range(1, 6)),
+        *(f"no_answer-{index:03d}" for index in range(1, 6)),
+        *(f"unauthorized-{index:03d}" for index in range(1, 5)),
+        *(f"injection-{index:03d}" for index in range(1, 5)),
+    }
+)
+PREVIOUS_THIRTY_CASES_CANONICAL_SHA256 = (
+    "c229beea258f798527a8d7e9152a5fe18cb48d9197d3270deb2567c667be231a"
+)
 NEW_CASE_IDS = frozenset(
     {
-        *(f"success-{index:03d}" for index in range(9, 13)),
-        *(f"ambiguity-{index:03d}" for index in range(4, 6)),
-        *(f"no_answer-{index:03d}" for index in range(4, 6)),
-        "unauthorized-004",
-        "injection-004",
+        *(f"success-{index:03d}" for index in range(13, 17)),
+        *(f"ambiguity-{index:03d}" for index in range(6, 8)),
+        *(f"no_answer-{index:03d}" for index in range(6, 8)),
+        "unauthorized-005",
+        "injection-005",
     }
 )
 
@@ -53,13 +65,13 @@ class EvaluationDatasetContractTests(unittest.TestCase):
 
         validate_case_contract(cases)
 
-        self.assertEqual(len(cases), 30)
+        self.assertEqual(len(cases), 40)
         self.assertEqual(
             Counter(case["category"] for case in cases),
             Counter(CATEGORY_COUNTS),
         )
-        self.assertEqual(len({case["case_id"] for case in cases}), 30)
-        self.assertEqual(len({case["question"] for case in cases}), 30)
+        self.assertEqual(len({case["case_id"] for case in cases}), 40)
+        self.assertEqual(len({case["question"] for case in cases}), 40)
 
         original_cases = [
             case for case in cases if case["case_id"] in ORIGINAL_CASE_IDS
@@ -78,10 +90,28 @@ class EvaluationDatasetContractTests(unittest.TestCase):
             ORIGINAL_CASES_CANONICAL_SHA256,
         )
 
+        previous_thirty = [
+            case for case in cases if case["case_id"] in PREVIOUS_THIRTY_CASE_IDS
+        ]
+        previous_thirty_canonical = "\n".join(
+            json.dumps(
+                case,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            for case in previous_thirty
+        ) + "\n"
+        self.assertEqual(len(previous_thirty), 30)
+        self.assertEqual(
+            hashlib.sha256(previous_thirty_canonical.encode("utf-8")).hexdigest(),
+            PREVIOUS_THIRTY_CASES_CANONICAL_SHA256,
+        )
+
         new_cases = [case for case in cases if case["case_id"] in NEW_CASE_IDS]
         self.assertEqual({case["case_id"] for case in new_cases}, NEW_CASE_IDS)
         for case in new_cases:
-            if case["category"] in {"no_answer", "unauthorized"}:
+            if case["category"] != "success":
                 self.assertIsNone(case["reference_sql"])
 
     def test_reference_sql_matches_workflow_without_business_mutation(self) -> None:

@@ -59,10 +59,27 @@
 - Python `3.13.12` 全量 `85` 项测试通过；`compileall`、44 包依赖、strict JSON、含 4 份知识文件
   的 wheel、园丁 current `9/0/0`、治理、Compose config、Web 构建 / SSR `2/2` 均通过。
 - 此阶段真实 Provider 调用、usage、token 与费用为 `0`；冻结 30 题、训练对和产品工作流均未修改。
+- 实现与本地证据先冻结为提交 `ea279fe72e05cb01c9933a72e11e0740b29050bd`，评测期间没有修改代码、
+  prompt、枚举数据、题面或 gold。
 
 ## Single-run evaluation evidence
 
-待唯一一轮评测后填写。
+- 首个零调用预检因 `git show --output` 对 blob 仍输出到 stdout 而得到空运行副本，严格数据合同在
+  Provider 前拒绝；该目录没有 checkpoint / report。最终预检从上一轮基线运行副本恢复精确字节，
+  去除换行差异后与当前 Git blob 完全相同，SHA-256 保持 `66857af3…b0a6a`。
+- 唯一 Provider 轮次 `enum30-20260802T151131Z` 对 30 条各运行一次；3 条由本地意图门处理，真实
+  Provider usage `27` 条，自动重试 `0`，未补跑、未调参、未改题。
+- 基线 → 枚举索引：执行成功率 `12/12 → 12/12`、答案正确率 `26/30 → 26/30`、人工介入率
+  `9/30 → 9/30`；没有案例改变正确性、action、初始状态、结果列或结果行。
+- 仍错误的 4 条为 `success-009..012`：四条都因无有界 `LIMIT` 发生非预期审批，`009/011` 另有
+  列别名不符；这些不属于枚举值根因，本轮不顺手修复。
+- usage 从 prompt / completion / total `30577/2392/32969` 变为
+  `32211/2262/34473` tokens，真实调用数仍为 `27`。正确率不降，但本轮没有证明指标提升。
+- 4 条越权执行与全部非成功 SQL 执行均为 `0`；逐案例和整轮业务库 SHA-256 始终为
+  `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`。
+- Git 忽略报告 `.local/model-eval-runner/runs/enum30-20260802T151131Z/report.json` 的 SHA-256 为
+  `cc74943b958695b44929ca4361b3f3f29405e614437dc575281d7a2cb7b19bd2`，敏感标记扫描无命中。
+  因 `26/30 >= 26/30`，满足进入本单预授权远端流程的门。
 
 ## Remote evidence
 

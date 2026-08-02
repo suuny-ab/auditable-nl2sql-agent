@@ -42,3 +42,9 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
 `32969` tokens。新 10 题正确 `6/10`，越权与全部非成功 SQL 执行均为 `0`，业务库哈希不变；
 它不替换旧 20 题结果。完整错误与报告哈希见
 [`docs/work/frozen-eval-30.md`](../docs/work/frozen-eval-30.md)。
+
+合成枚举值索引后的唯一复跑 `enum30-20260802T151131Z` 保持执行成功率 `12/12`、答案正确率
+`26/30`、人工介入率 `9/30`，30 条的判定与结果均未改变；真实 Provider usage 仍为 `27` 条，
+total tokens 从 `32969` 增至 `34473`，自动重试 `0`。越权与全部非成功 SQL 执行均为 `0`，业务
+库哈希不变；该轮证明不降但没有证明指标提升。完整边界见
+[`docs/work/enum-value-index.md`](../docs/work/enum-value-index.md)。

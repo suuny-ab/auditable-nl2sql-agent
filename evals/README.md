@@ -93,3 +93,10 @@ transport，35 条保存 usage，自动重试 `0`，合计 `45620` tokens。两�
 `no_answer`，所有 SQL 执行和越权执行均为 `0`，业务库哈希不变。该首个数字按 HOLDOUT 纪律封存，
 证明当前 schema 泛化不足；不据此修改考场或补跑。完整证据见
 [`docs/work/schema-holdout.md`](../docs/work/schema-holdout.md)。
+
+规则式 schema 知识自动构建接入后的唯一复测 `autoknowledge15-20260802T172429Z` 使用同一 LF 冻结
+HOLDOUT，执行成功率 `0/7 → 3/7`、答案正确率 `6/15 → 8/15`、人工介入率
+`2/15 → 5/15`；15 条 usage 的 total tokens 为 `20911`，自动重试 `0`。两条歧义题恢复正确澄清，
+但成功题仍为 `0/7`；三条成功 SQL 虽只读执行，仍因状态码、金额单位 / 结果和审批不符而判错。越权
+与全部非成功 SQL 执行为 `0`，业务库哈希不变；结果只证明局部路由改善，不代表 schema 泛化成功。
+完整证据见 [`docs/work/schema-knowledge-builder.md`](../docs/work/schema-knowledge-builder.md)。

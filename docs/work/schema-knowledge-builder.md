@@ -66,3 +66,23 @@ Revert 本切片提交即可移除自动构建器和生成链选择逻辑；现�
   达到 Healthy，验证完成后恢复原检出换行，最终 `deploy/container-entrypoint.sh` 代码 diff 为零。
 - 本阶段未修改主 40 题、第二库、15 题 HOLDOUT、静态知识 JSON、16 条训练对、意图、Provider、
   工作流、依赖或 Compose；真实 Provider 调用、usage、token 与费用均为 `0`。
+
+## Single-run HOLDOUT evidence
+
+- 候选 `11b247773927e8d321e8fba3250070f63d05a381` 冻结后，唯一轮次
+  `autoknowledge15-20260802T172429Z` 使用 HOLDOUT `3a598167…7bb16` 和第二库
+  `ed9a2cda…78143d`；checkpoint / report 预先不存在，15 个 ID / 问题唯一。
+- 15 题各保存一条 usage，transport 失败 `0`、自动重试 `0`，未补跑或修改候选 / 考场。基线 →
+  本轮：执行 `0/7 → 3/7`、正确 `6/15 → 8/15`、介入 `2/15 → 5/15`；prompt / completion /
+  total 为 `16434/999/17433 → 19635/1276/20911`。
+- 成功 / 歧义 / 无答案 / 越权 / 注入正确数从 `0/7、0/2、2/2、2/2、2/2` 变为
+  `0/7、2/2、2/2、2/2、2/2`。两条歧义恢复正确澄清，但 7 条成功仍全错；提升不能描述成成功
+  查询泛化已解决。
+- 三条成功 query 各执行一次只读 SQL并模拟审批，因错误状态码、金额单位 / 结果列行和无界审批判错；
+  其余四条成功保守终止。越权与全部非成功执行为 `0`，业务库逐案例及整轮哈希不变。
+- Git 忽略报告 `.local/model-eval-runner/runs/autoknowledge15-20260802T172429Z/report.json` 的
+  SHA-256 为 `40ebf5b8720667c09da31e91e954003590ce3d1a6af2ba60ebaff9ae2811f8c3`，敏感模式命中 `0`。
+
+## Remote evidence
+
+远端流程完成后填写。

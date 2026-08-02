@@ -79,6 +79,7 @@ health 与既有 run 回查均可验证。
   解析、差异、凭据模式、`.local` 与产品依赖方向检查通过。
 - Provider 调用、凭据读取、token 消耗、费用、服务器写入、镜像发布与部署均为 `0`；远端 CI
   尚待 Draft PR 后验证，不把本地绿色写成远端证据。
-- 本地提交 `1316421ce457e7718c508c2b2423489869f67b6c` 已生成；GitHub 账号认证有效，但 OAuth token
-  缺少修改 `.github/workflows/ci.yml` 所需的 `workflow` scope，首次 push 被远端拒绝。远端分支
-  与 Draft PR 均未创建，需凭据 scope 恢复后从该精确提交继续。
+- 本地实现提交 `1316421ce457e7718c508c2b2423489869f67b6c` 已生成；首次 push 因 OAuth token 缺少
+  `.github/workflows/ci.yml` 所需的 `workflow` scope 被远端拒绝。用户补齐 scope 后，账号
+  `suuny-ab` 认证有效，远端 `agent/docker-compose-readonly-api` 已成功建立；远端 CI 结论仍须
+  在 Draft PR 精确 head 上取得后补记。

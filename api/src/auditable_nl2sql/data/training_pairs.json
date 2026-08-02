@@ -1,0 +1,58 @@
+{
+  "schema_version": "training-pairs-v1",
+  "similarity": {
+    "algorithm": "normalized-character-bigram-jaccard-v1",
+    "threshold": 0.72,
+    "max_matches": 2
+  },
+  "pairs": [
+    {
+      "source_case_id": "success-001",
+      "question": "2026年第一季度非取消订单销售额是多少？",
+      "sql": "SELECT ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) WHERE sales_order.status != 'cancelled' AND sales_order.order_date >= '2026-01-01' AND sales_order.order_date < '2026-04-01'",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-002",
+      "question": "合成订单一共有多少笔？",
+      "sql": "SELECT COUNT(*) AS order_count FROM orders",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-003",
+      "question": "状态为已完成的订单有多少笔？",
+      "sql": "SELECT COUNT(*) AS completed_order_count FROM orders WHERE status = 'completed'",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-004",
+      "question": "非取消订单按销售渠道统计销售额，结果从高到低是什么？",
+      "sql": "SELECT sales_order.sales_channel, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) WHERE sales_order.status != 'cancelled' GROUP BY sales_order.sales_channel ORDER BY revenue DESC, sales_order.sales_channel LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-005",
+      "question": "按非取消订单销售额计算，销售额最高的商品是什么？",
+      "sql": "SELECT product.product_name, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) JOIN products AS product USING (product_id) WHERE sales_order.status != 'cancelled' GROUP BY product.product_id, product.product_name ORDER BY revenue DESC, product.product_id LIMIT 1",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-006",
+      "question": "非取消订单按客户统计销售额，排名是什么？",
+      "sql": "SELECT customer.customer_name, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) JOIN customers AS customer USING (customer_id) WHERE sales_order.status != 'cancelled' GROUP BY customer.customer_id, customer.customer_name ORDER BY revenue DESC, customer.customer_id LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-007",
+      "question": "订单 O1001 包含哪些商品、数量、单价和行金额？",
+      "sql": "SELECT product.product_name, item.quantity, item.unit_price, ROUND(item.quantity * item.unit_price, 2) AS line_amount FROM order_items AS item JOIN products AS product USING (product_id) WHERE item.order_id = 'O1001' ORDER BY item.product_id LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-008",
+      "question": "列出全部十一条订单商品明细。",
+      "sql": "SELECT order_id, product_id, quantity, unit_price FROM order_items ORDER BY order_id, product_id LIMIT 11",
+      "enabled": true
+    }
+  ]
+}

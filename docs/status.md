@@ -6,20 +6,20 @@
 | --- | --- |
 | `state` | `in-progress` |
 | 更新时间 | `2026-08-02` |
-| 当前切片 | `WEB-SHOWCASE-REPLAY-022`：本地静态展示页与真实只读 run 回放 |
-| 最近完成 | `DOC-GARDENER-021`：PR #16 合并为 `ecfbea24`，main 双 CI 通过 |
-| 当前状态 | 本地页面完成；Web 构建 / SSR 2 项、Python 3.13 全量 69 项测试及治理 / Compose 门均通过 |
-| 完成门 | 精确 head 的 `web` / `api` / `container` CI 全绿后 squash；本片不部署 |
-| 项目基线 | `origin/main@ecfbea24`；main CI run `30744938052` 成功 |
-| 阻碍 | 无；页面内容必须保持合成数据、只读回放和非生产级边界 |
+| 当前切片 | `TRAINING-PAIR-RETRIEVAL-024`：冻结成功案例训练对与轻量相似召回 |
+| 最近完成 | `WEB-SHOWCASE-REPLAY-022`：PR #17 合并为 `03c84b6a`，main 三个 CI job 全绿 |
+| 当前状态 | 8 条训练对与召回已实现；Python 全量 `74` 项、Web 构建 / SSR 2 项及全部本地门通过 |
+| 完成门 | 训练对合同、命中 / 未命中 / 禁用测试与全量门通过；精确 head 三 CI 绿后 squash |
+| 项目基线 | `origin/main@03c84b6a`；main CI run `30746089212` 成功 |
+| 阻碍 | 无；候选待本单唯一一次 push、Draft PR 与精确 head 三 CI |
 
 ## 当前队列
 
-- 待远端门：单页展示、一个真实回放、证据入口及 Web CI 已完成；不增加交互问答或部署。
-- 后续：部署页面须用户另行当次批准；本片只交付本地启动证据。
+- 已完成本地：8 条可禁用训练对，阈值 `0.72`、最多召回 2 条，三条定向路径全绿。
+- 不做：向量库、embedding、工作流改造、Provider 调用或评测复跑。
 - 保留：首次真实 20 条基线 `7/8`、`14/20`、`7/20`，不做 prompt 调优或补跑。
 
 ## 下一检查点
 
-- 只推送当前精确候选并创建 Draft PR；`web` / `api` / `container` CI 任一不绿则不合并。
-- 合并后复核 main CI、写两层最终回执并归档派发单；页面部署继续保持红灯。
+- 只推送最终精确候选一次并创建 Draft PR；三 CI 任一不绿则不合并。
+- 远端全绿后 squash，复核 main CI 并写两层最终回执；不顺手启动评测复跑。

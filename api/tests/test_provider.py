@@ -49,6 +49,28 @@ def _schema() -> list[dict[str, Any]]:
     ]
 
 
+def _knowledge_schema() -> list[dict[str, Any]]:
+    return [
+        {
+            "name": "orders",
+            "columns": [
+                {"name": "order_id"},
+                {"name": "status"},
+                {"name": "sales_channel"},
+            ],
+            "foreign_keys": [],
+        },
+        {
+            "name": "order_items",
+            "columns": [
+                {"name": "quantity"},
+                {"name": "unit_price"},
+            ],
+            "foreign_keys": [],
+        },
+    ]
+
+
 def _response(
     *,
     action: str = "query",
@@ -153,6 +175,37 @@ class ProviderContractTests(unittest.TestCase):
         self.assertIn("unsafe_operation", request["messages"][0]["content"])
         self.assertIn(CANONICAL_QUESTION, request["messages"][1]["content"])
         self.assertNotIn("DEEPSEEK_API_KEY", json.dumps(request))
+
+    def test_request_injects_matched_terms_and_related_field_notes(self) -> None:
+        transport = FakeTransport(_response())
+        generator = DeepSeekSqlGenerator(enabled=True, transport=transport)
+
+        generator.generate(
+            "按有效订单的 GMV 统计渠道。",
+            _knowledge_schema(),
+        )
+
+        user_content = transport.calls[0]["messages"][1]["content"]
+        request_input = json.loads(user_content.split("\n", maxsplit=1)[1])
+        context = request_input["business_context"]
+        self.assertEqual(context["schema_version"], "business-context-v1")
+        self.assertEqual(
+            [term["term"] for term in context["matched_terms"]],
+            ["销售额", "非取消订单", "订单", "销售渠道"],
+        )
+        self.assertEqual(context["matched_terms"][0]["matched_by"], ["GMV"])
+        self.assertEqual(
+            [f"{note['table']}.{note['field']}" for note in context["field_notes"]],
+            [
+                "order_items.quantity",
+                "order_items.unit_price",
+                "orders.order_id",
+                "orders.sales_channel",
+                "orders.status",
+            ],
+        )
+        self.assertNotIn("客户分群", user_content)
+        self.assertEqual(request_input["data_boundary"], "all records and names are synthetic")
 
     def test_non_query_decisions_fail_closed_with_stable_codes(self) -> None:
         expected_codes = {

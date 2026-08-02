@@ -28,6 +28,17 @@ from .evidence import (
     validate_result,
     verify_evidence,
 )
+from .knowledge import (
+    BUSINESS_CONTEXT_SCHEMA_VERSION,
+    BUSINESS_TERMS_SCHEMA_VERSION,
+    FIELD_DESCRIPTIONS_SCHEMA_VERSION,
+    BusinessKnowledge,
+    BusinessKnowledgeError,
+    BusinessTerm,
+    FieldDescription,
+    build_business_context,
+    load_business_knowledge,
+)
 from .provider import (
     DEEPSEEK_CHAT_COMPLETIONS_URL,
     DEEPSEEK_DEFAULT_MODEL,
@@ -81,6 +92,15 @@ __all__ = [
     "bind_evidence",
     "validate_result",
     "verify_evidence",
+    "BUSINESS_CONTEXT_SCHEMA_VERSION",
+    "BUSINESS_TERMS_SCHEMA_VERSION",
+    "FIELD_DESCRIPTIONS_SCHEMA_VERSION",
+    "BusinessKnowledge",
+    "BusinessKnowledgeError",
+    "BusinessTerm",
+    "FieldDescription",
+    "build_business_context",
+    "load_business_knowledge",
     "DEEPSEEK_CHAT_COMPLETIONS_URL",
     "DEEPSEEK_DEFAULT_MODEL",
     "PROVIDER_RECEIPT_SCHEMA_VERSION",

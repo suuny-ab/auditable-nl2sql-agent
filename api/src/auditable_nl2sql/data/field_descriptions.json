@@ -1,0 +1,46 @@
+{
+  "schema_version": "field-descriptions-v1",
+  "tables": [
+    {
+      "name": "customers",
+      "description": "合成客户主数据。",
+      "fields": [
+        {"name": "customer_id", "description": "客户的合成唯一标识。"},
+        {"name": "customer_name", "description": "客户的合成展示名称。"},
+        {"name": "region", "description": "客户所属的合成地理区域。"},
+        {"name": "segment", "description": "客户所属的合成业务分群。"}
+      ]
+    },
+    {
+      "name": "products",
+      "description": "合成商品主数据。",
+      "fields": [
+        {"name": "product_id", "description": "商品的合成唯一标识。"},
+        {"name": "product_name", "description": "商品的合成展示名称。"},
+        {"name": "category", "description": "商品所属的合成品类。"},
+        {"name": "list_price", "description": "商品目录标价，不代表订单实际成交单价。"}
+      ]
+    },
+    {
+      "name": "orders",
+      "description": "合成销售订单主表。",
+      "fields": [
+        {"name": "order_id", "description": "订单的合成唯一标识。"},
+        {"name": "customer_id", "description": "下单客户标识，关联 customers.customer_id。"},
+        {"name": "order_date", "description": "订单日期，使用 YYYY-MM-DD 文本格式。"},
+        {"name": "status", "description": "订单状态：paid、shipped、completed 或 cancelled。"},
+        {"name": "sales_channel", "description": "订单的销售渠道。"}
+      ]
+    },
+    {
+      "name": "order_items",
+      "description": "合成订单商品明细。",
+      "fields": [
+        {"name": "order_id", "description": "所属订单标识，关联 orders.order_id。"},
+        {"name": "product_id", "description": "商品标识，关联 products.product_id。"},
+        {"name": "quantity", "description": "该订单行的正整数购买数量。"},
+        {"name": "unit_price", "description": "该订单行的实际成交单价，用于计算销售额。"}
+      ]
+    }
+  ]
+}

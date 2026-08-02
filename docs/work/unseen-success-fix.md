@@ -70,10 +70,27 @@
   Web 构建 / SSR `2/2`、凭据模式、产品反向导入与 diff 检查通过；wheel 成功包含四份知识 JSON。
 - `evals/cases.jsonl` 无差异，工作树文件 blob 与 `HEAD` 均为
   `8abbe54789ad48dfe478ff639c9c84eece64d2ff`；工作流、Provider adapter、意图门和依赖均未修改。
+- 实现与本地证据冻结为候选提交 `3775c85715cf79462fb02e09cdd1445d58e219e0`；真实评测期间没有
+  修改代码、知识数据、题面、gold、阈值或 prompt。
 
 ## Single-run evaluation evidence
 
-待唯一复跑后填写。
+- 唯一轮次 `devfix30-20260802T153713Z` 使用上一轮保存的精确题集字节，SHA-256
+  `66857af303ae1ac0010a077bf6beae8b46db1d92e7bf6398dcf9968686cb0a6a`；其 30 行规范化内容与
+  当前 Git 题集完全相等。新业务库、checkpoint 与 report 路径在运行前均不存在。
+- 30 个唯一案例各运行一次；3 条由本地意图门处理，真实 Provider usage `27` 条，自动重试 `0`，
+  未补跑、未调参、未改题。执行 `12/12 → 12/12`、正确 `26/30 → 30/30`、人工介入
+  `9/30 → 5/30`。
+- `success-009..012` 四条均由 `pending_approval` 变为直接 `completed` 并判定正确；生成 SQL 均含
+  `LIMIT 5`，结果列依次为 `order_month,revenue`、`region,order_count,revenue`、
+  `category,units_sold,revenue`、`customer_name,order_count,revenue`。
+- prompt / completion / total tokens 从 `32211/2262/34473` 变为 `32774/2276/35050`。本轮只证明
+  对四条已见开发集错误的修复，不是独立未见集或泛化提升证据。
+- 越权执行与全部非成功类别 SQL 执行均为 `0`；逐案例和整轮业务库 SHA-256 始终为
+  `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`。
+- Git 忽略报告 `.local/model-eval-runner/runs/devfix30-20260802T153713Z/report.json` 的 SHA-256 为
+  `f1b9bd0698e28ef97d2f789e7aa281833111308db879a7ef63eb368842a6294d`，敏感标记扫描无命中。
+  因 `30/30 >= 26/30`，满足进入本单预授权远端流程的门。
 
 ## Remote evidence
 

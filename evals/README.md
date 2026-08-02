@@ -48,3 +48,9 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
 total tokens 从 `32969` 增至 `34473`，自动重试 `0`。越权与全部非成功 SQL 执行均为 `0`，业务
 库哈希不变；该轮证明不降但没有证明指标提升。完整边界见
 [`docs/work/enum-value-index.md`](../docs/work/enum-value-index.md)。
+
+把 `success-009..012` 明确作为已见开发集并补入版本化知识层后，唯一复跑
+`devfix30-20260802T153713Z` 得到执行成功率 `12/12`、答案正确率 `30/30`、人工介入率 `5/30`；
+真实 Provider usage `27` 条、自动重试 `0`、合计 `35050` tokens。越权与全部非成功 SQL 执行仍
+为 `0`，业务库哈希不变；该结果只证明已见错误被修复，不构成新的未见或泛化证据。完整边界见
+[`docs/work/unseen-success-fix.md`](../docs/work/unseen-success-fix.md)。

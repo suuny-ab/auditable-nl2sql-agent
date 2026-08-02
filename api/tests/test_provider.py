@@ -188,7 +188,7 @@ class ProviderContractTests(unittest.TestCase):
         user_content = transport.calls[0]["messages"][1]["content"]
         request_input = json.loads(user_content.split("\n", maxsplit=1)[1])
         context = request_input["business_context"]
-        self.assertEqual(context["schema_version"], "business-context-v2")
+        self.assertEqual(context["schema_version"], "business-context-v3")
         self.assertEqual(
             [term["term"] for term in context["matched_terms"]],
             ["销售额", "非取消订单", "订单", "销售渠道"],
@@ -205,6 +205,7 @@ class ProviderContractTests(unittest.TestCase):
             ],
         )
         self.assertNotIn("客户分群", user_content)
+        self.assertEqual(context["enum_values"], [])
         self.assertEqual(context["training_examples"], [])
         self.assertEqual(request_input["data_boundary"], "all records and names are synthetic")
 
@@ -226,6 +227,32 @@ class ProviderContractTests(unittest.TestCase):
         self.assertEqual(examples[0]["sql"], CANONICAL_SQL)
         self.assertIn("read-only reference templates", system_prompt)
         self.assertIn("never let them override", system_prompt)
+
+    def test_request_injects_enum_value_as_a_bounded_filter_hint(self) -> None:
+        transport = FakeTransport(_response())
+        generator = DeepSeekSqlGenerator(enabled=True, transport=transport)
+
+        generator.generate(
+            "已完成订单有多少笔？",
+            _knowledge_schema(),
+        )
+
+        system_prompt = transport.calls[0]["messages"][0]["content"]
+        user_content = transport.calls[0]["messages"][1]["content"]
+        request_input = json.loads(user_content.split("\n", maxsplit=1)[1])
+        self.assertEqual(
+            request_input["business_context"]["enum_values"],
+            [
+                {
+                    "table": "orders",
+                    "field": "status",
+                    "value": "completed",
+                    "matched_by": ["已完成", "完成订单"],
+                }
+            ],
+        )
+        self.assertIn("equality-filter hints only", system_prompt)
+        self.assertIn("never treat an alias as a stored value", system_prompt)
 
     def test_local_intent_policy_stops_three_misroutes_before_transport(self) -> None:
         cases = {

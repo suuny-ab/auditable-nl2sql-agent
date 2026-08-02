@@ -66,5 +66,26 @@ Revert 本切片提交即可移除两份知识文件、loader 和 Provider 输�
   报错确认是已知 shebang 问题后，仅把当前工作树脚本规范化为与 Git blob 相同的 LF（最终代码
   diff 为零）。第三次也是最后一次尝试达到 Healthy，health 返回 `read_only=true`，固定 run 为
   `container-demo-run/completed/run-record-v5`，随后只清理本切片 Compose 项目。
-- 一次性真实 20 条评测尚未获授权，因此 Provider 调用、token 和费用均为 `0`；授权请求已写入
-  `派发/授权请求.md`，未把这一步的缺失写成效果已验证。
+- 本地门完成时，一次性真实 20 条评测尚未获授权，因此当时 Provider 调用、token 和费用均为
+  `0`；授权请求已写入 `派发/授权请求.md`，没有把当时缺失的步骤写成效果已验证。
+
+## Frozen evaluation evidence
+
+- 用户于 `2026-08-02` 明文批准仅此一轮 20 次真实调用。`knowledge-20260802T100534Z` 对冻结
+  `cases.jsonl` 的 20 个唯一 case 各调用 `deepseek-v4-flash` 一次，20 条均有脱敏 usage，报告
+  `automatic_retries=0`；没有补跑、调参或第二轮。
+- 首次基线 → 业务知识层：执行成功率 `7/8 → 8/8`，答案正确率 `14/20 → 15/20`，人工介入率
+  `7/20 → 7/20`；prompt `17664 → 20897`、completion `1567 → 1393`、total
+  `19231 → 22290` tokens。
+- `success-002` 从 `no_answer` 变为正确查询，`ambiguity-002` 从错误查询变为正确澄清；
+  `ambiguity-001` 从正确澄清退化为错误查询。`success-007` 的结果列错误消失但仍有非预期审批，
+  `success-006` 新增结果列/行不匹配；净结果为 `+1/20`，不能描述成普遍准确率提升。
+- 最终错误为 `success-004/006/007`、`ambiguity-001`、`no_answer-001`。两条非成功类别各执行一次
+  只读 SQL；3 条越权案例执行次数均为 `0`，越权执行总数为 `0`。
+- 业务库整轮前后及逐案例 SHA-256 均为
+  `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`；数据集 SHA-256 为
+  `c30a23534317082caecab4a70d70036bd11511dda14fefc3f9630111f88ca3b6`。
+- 脱敏报告位于 Git 忽略目录
+  `.local/evaluations/knowledge-20260802T100534Z/report.json`，SHA-256 为
+  `666ce549956f69639b28fdac55d5b7781de42f0ffad8594e2cb22d9bc53e3102`；未保存 key、header、
+  原始 HTTP 包或隐藏思维。

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,9 @@ from auditable_nl2sql import (
     WorkflowRunner,
     validate_result,
 )
+
+
+CaseValidator = Callable[[Iterable[Mapping[str, Any]]], None]
 
 
 CASE_SCHEMA_VERSION = "eval-case-v1"
@@ -212,11 +215,12 @@ def validate_reference_cases(
     *,
     business_database: str | Path,
     checkpoint_database: str | Path,
+    case_validator: CaseValidator = validate_case_contract,
 ) -> None:
     """Re-run frozen SQL through the product workflow without computing metrics."""
 
     materialized = list(cases)
-    validate_case_contract(materialized)
+    case_validator(materialized)
     executable = [
         case
         for case in materialized

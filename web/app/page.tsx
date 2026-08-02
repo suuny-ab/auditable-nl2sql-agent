@@ -10,6 +10,7 @@ type ReplayStep = {
 const replay = replayData.record;
 const source = replayData.source;
 const steps = replay.trajectory as ReplayStep[];
+const repoBase = "https://github.com/suuny-ab/auditable-nl2sql-agent";
 
 const stepCopy: Record<string, { label: string; eyebrow: string }> = {
   load_schema: { label: "读取 Schema", eyebrow: "检索" },
@@ -70,6 +71,93 @@ const evidenceLinks = [
   },
 ];
 
+const tuningArc = [
+  {
+    step: "01",
+    score: "14/20",
+    label: "冻结基线",
+    detail: "同一 20 题开发集 · 首次受控真实调用",
+    report: "model-eval-runner.md",
+    pr: "9",
+  },
+  {
+    step: "02",
+    score: "17/20",
+    label: "训练对注入",
+    detail: "同一 20 题开发集 · 只复用版本化训练对",
+    report: "training-pair-frozen-eval.md",
+    pr: "19",
+  },
+  {
+    step: "03",
+    score: "20/20",
+    label: "意图路由修复",
+    detail: "同一 20 题开发集 · 观察错误后定向修复",
+    report: "intent-routing-fix.md",
+    pr: "20",
+  },
+  {
+    step: "04",
+    score: "30/30",
+    label: "成功题补齐",
+    detail: "主库已见开发集 · 观察失败样本后修复",
+    report: "unseen-success-fix.md",
+    pr: "23",
+  },
+  {
+    step: "05",
+    score: "40/40",
+    label: "难例补齐",
+    detail: "主库已见 40 题开发集 · 观察错误后修复",
+    report: "hardcase-fix.md",
+    pr: "25",
+  },
+];
+
+const generalizationDimensions = [
+  {
+    score: "40/40",
+    label: "主库已见开发集",
+    detail: "观察 40 题错误并完成定向修复后的开发集成绩。",
+    boundary: "已见开发集满分 ≠ 未见泛化",
+    report: "hardcase-fix.md",
+    pr: "25",
+  },
+  {
+    score: "8/15",
+    label: "换 schema",
+    detail: "第二套合成库的总正确率；结构摘要轮次没有提分。",
+    boundary: "成功题仍为 0/7",
+    report: "schema-summary-injection.md",
+    pr: "30",
+  },
+  {
+    score: "投影 27/30",
+    label: "同义改述",
+    detail: "旧完整基线 24/30，加上掉分三题的定向结果。",
+    boundary: "仅复跑 3 条，不是完整 30 题新轮次",
+    report: "paraphrase-synonym-coverage.md",
+    pr: "29",
+  },
+];
+
+function EvidencePair({ report, pr }: { report: string; pr: string }) {
+  return (
+    <span className="metric-links">
+      <a
+        href={`${repoBase}/blob/main/docs/work/${report}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        报告 ↗
+      </a>
+      <a href={`${repoBase}/pull/${pr}`} target="_blank" rel="noreferrer">
+        PR #{pr} ↗
+      </a>
+    </span>
+  );
+}
+
 export default function Home() {
   return (
     <main>
@@ -83,6 +171,7 @@ export default function Home() {
           <span className="brand-name">Auditable Agent</span>
         </a>
         <nav aria-label="主要导航">
+          <a href="#validation">验证弧线</a>
           <a href="#replay">真实回放</a>
           <a href="#proof">证据入口</a>
           <a href="#boundaries">能力边界</a>
@@ -177,9 +266,78 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="validation-section" id="validation">
+        <div className="section-heading validation-heading">
+          <p className="section-number">01 / VALIDATION ARC</p>
+          <h2>成绩会涨，证据边界不能跟着膨胀。</h2>
+          <p>
+            五次成绩来自受控开发过程。每一步都回指版本化报告与代码变更，但这条线记录的是调优轨迹，
+            不是五次独立未见评测。
+          </p>
+        </div>
+
+        <div className="validation-warning" role="note">
+          <strong>读图边界</strong>
+          <span>前三步复用同一 20 题开发集；后两步也是观察错误后修复的主库开发集。</span>
+          <b>已见开发集满分 ≠ 未见泛化</b>
+        </div>
+
+        <ol className="validation-arc" aria-label="五步调优成绩弧线">
+          {tuningArc.map((milestone) => (
+            <li key={milestone.step}>
+              <article className="arc-card">
+                <span className="arc-step">{milestone.step}</span>
+                <strong className="arc-score">{milestone.score}</strong>
+                <h3>{milestone.label}</h3>
+                <p>{milestone.detail}</p>
+                <EvidencePair report={milestone.report} pr={milestone.pr} />
+              </article>
+            </li>
+          ))}
+        </ol>
+
+        <div className="generalization-heading">
+          <p className="section-number">THREE DIMENSIONS</p>
+          <h3>把主库成绩、换库能力和语言改述拆开看。</h3>
+        </div>
+        <div className="generalization-grid">
+          {generalizationDimensions.map((dimension) => (
+            <article className="dimension-card" key={dimension.label}>
+              <p>{dimension.label}</p>
+              <strong>{dimension.score}</strong>
+              <span>{dimension.detail}</span>
+              <b>{dimension.boundary}</b>
+              <EvidencePair report={dimension.report} pr={dimension.pr} />
+            </article>
+          ))}
+        </div>
+
+        <div className="shortfall-panel">
+          <div className="shortfall-finding">
+            <p className="section-number">EXPOSED SHORTFALL</p>
+            <strong>0/7</strong>
+            <h3>结构可见 ≠ 值语义可用</h3>
+            <p>
+              换 schema 的成功题仍为 0/7。紧凑结构摘要没有提分；未知枚举值、金额单位、输出别名与
+              审批阈值合同仍会让系统保守终止或答非所问。
+            </p>
+            <EvidencePair report="schema-summary-injection.md" pr="30" />
+          </div>
+          <div className="route-list">
+            <p className="route-label">候选假设 · 未实现</p>
+            <ol>
+              <li>为陌生 schema 引入有界、版本化的值语义，而不是猜枚举。</li>
+              <li>把金额单位、输出别名与 limit / 审批阈值写成可机检合同。</li>
+              <li>在第三套未触碰合成 schema 上验证，再决定是否保留改道。</li>
+            </ol>
+            <small>这些是下一轮验证方向，不是当前能力，也不是已排期承诺。</small>
+          </div>
+        </div>
+      </section>
+
       <section className="replay-section" id="replay">
         <div className="section-heading">
-          <p className="section-number">01 / REAL REPLAY</p>
+          <p className="section-number">02 / REAL REPLAY</p>
           <h2>不是示意图，是一个真实完成的 run。</h2>
           <p>
             页面快照来自公开只读接口，并由同一产品 fixture 重新生成后逐字段校验。run ID 可直接回查。
@@ -257,7 +415,7 @@ export default function Home() {
 
       <section className="evidence-section" id="proof">
         <div className="evidence-copy">
-          <p className="section-number">02 / EVIDENCE</p>
+          <p className="section-number">03 / EVIDENCE</p>
           <h2>答案不是终点，证据链才是。</h2>
           <p>
             这个回答只引用结果中的一个单元格。问题、SQL、Schema 快照、查询结果与校验回执共同形成
@@ -284,7 +442,7 @@ export default function Home() {
 
       <section className="boundaries-section" id="boundaries">
         <div className="section-heading compact">
-          <p className="section-number">03 / BOUNDARIES</p>
+          <p className="section-number">04 / BOUNDARIES</p>
           <h2>把能证明的，与不能证明的分开。</h2>
         </div>
         <div className="boundary-grid">
@@ -319,7 +477,7 @@ export default function Home() {
 
       <footer>
         <span>Auditable NL2SQL Agent</span>
-        <span>本地静态展示 · 未部署页面 · 2026</span>
+        <span>v2 本地候选 · 尚未部署 · 2026</span>
       </footer>
     </main>
   );

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 
-const title = "Auditable NL2SQL · 从问题到证据链";
+const title = "Auditable NL2SQL · 验证弧线与证据链";
 const description =
-  "用一个可回查的合成数据 run，展示自然语言问题、SQL、只读执行、证据指纹与回答如何绑定。";
+  "用可回查报告展示调优弧线、泛化短板与一个合成数据 run 的 SQL、只读执行、证据指纹和回答。";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -36,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: socialImage,
           width: 1536,
           height: 1024,
-          alt: "Auditable NL2SQL — 从问题到证据链",
+          alt: "Auditable NL2SQL — 验证弧线与证据链",
         },
       ],
     },

@@ -1,8 +1,62 @@
 {
   "schema_version": "enum-values-v1",
   "tables": [
-    {"name": "buyer_directory", "fields": []},
-    {"name": "merchandise", "fields": []},
-    {"name": "transaction_lines", "fields": []}
+    {
+      "name": "buyer_directory",
+      "fields": [
+        {
+          "name": "market_area",
+          "values": [
+            {"value": "华东", "aliases": []},
+            {"value": "华北", "aliases": []},
+            {"value": "华南", "aliases": []},
+            {"value": "西南", "aliases": []}
+          ]
+        },
+        {
+          "name": "buyer_class",
+          "values": [
+            {"value": "企业", "aliases": []},
+            {"value": "零售", "aliases": []}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "merchandise",
+      "fields": [
+        {
+          "name": "department",
+          "values": [
+            {"value": "办公", "aliases": []},
+            {"value": "家居", "aliases": []},
+            {"value": "户外", "aliases": []},
+            {"value": "数码", "aliases": []}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "transaction_lines",
+      "fields": [
+        {
+          "name": "state_code",
+          "values": [
+            {"value": "CLOSED", "aliases": []},
+            {"value": "IN_TRANSIT", "aliases": []},
+            {"value": "SETTLED", "aliases": []},
+            {"value": "VOID", "aliases": []}
+          ]
+        },
+        {
+          "name": "source_code",
+          "values": [
+            {"value": "PLATFORM", "aliases": []},
+            {"value": "SHOP", "aliases": []},
+            {"value": "WEB", "aliases": []}
+          ]
+        }
+      ]
+    }
   ]
 }

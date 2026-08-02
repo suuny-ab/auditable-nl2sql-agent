@@ -21,10 +21,13 @@ from auditable_nl2sql import (
     ProviderDisabledError,
     ProviderResponseError,
     ProviderTransportError,
+    SCHEMA_HOLDOUT_DATASOURCE_ID,
     WorkflowRunner,
+    read_schema,
     verify_evidence,
 )
 from auditable_nl2sql.demo import create_demo_database
+from evals.schema_holdout import create_schema_holdout_database
 
 
 def _sha256(path: Path) -> str:
@@ -47,6 +50,38 @@ def _schema() -> list[dict[str, Any]]:
             "foreign_keys": [],
         }
     ]
+
+
+def _schema_snapshot(database_path: Path) -> list[dict[str, Any]]:
+    snapshot: list[dict[str, Any]] = []
+    for table in read_schema(database_path):
+        table_payload: dict[str, Any] = {
+            "name": table.name,
+            "columns": [],
+            "foreign_keys": [
+                {
+                    "column": key.column,
+                    "referenced_table": key.referenced_table,
+                    "referenced_column": key.referenced_column,
+                }
+                for key in table.foreign_keys
+            ],
+        }
+        if table.description is not None:
+            table_payload["description"] = table.description
+        for column in table.columns:
+            column_payload: dict[str, Any] = {
+                "name": column.name,
+                "declared_type": column.declared_type,
+                "nullable": column.nullable,
+                "primary_key_position": column.primary_key_position,
+                "default_value": column.default_value,
+            }
+            if column.description is not None:
+                column_payload["description"] = column.description
+            table_payload["columns"].append(column_payload)
+        snapshot.append(table_payload)
+    return snapshot
 
 
 def _knowledge_schema() -> list[dict[str, Any]]:
@@ -252,8 +287,46 @@ class ProviderContractTests(unittest.TestCase):
                 }
             ],
         )
-        self.assertIn("equality-filter hints only", system_prompt)
+        self.assertIn("bounded equality-filter hints", system_prompt)
         self.assertIn("never treat an alias as a stored value", system_prompt)
+
+    def test_request_injects_collected_values_for_related_holdout_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database = create_schema_holdout_database(
+                Path(directory) / "holdout.sqlite3"
+            )
+            schema = _schema_snapshot(database)
+        transport = FakeTransport(_response())
+        generator = DeepSeekSqlGenerator(
+            enabled=True,
+            transport=transport,
+            datasource_id=SCHEMA_HOLDOUT_DATASOURCE_ID,
+        )
+
+        generator.generate(
+            "非取消订单按销售渠道统计销售额，结果从高到低是什么？",
+            schema,
+        )
+
+        system_prompt = transport.calls[0]["messages"][0]["content"]
+        user_content = transport.calls[0]["messages"][1]["content"]
+        request_input = json.loads(user_content.split("\n", maxsplit=1)[1])
+        self.assertEqual(
+            [
+                (item["field"], item["value"], item["matched_by"])
+                for item in request_input["business_context"]["enum_values"]
+            ],
+            [
+                ("source_code", "PLATFORM", []),
+                ("source_code", "SHOP", []),
+                ("source_code", "WEB", []),
+                ("state_code", "CLOSED", []),
+                ("state_code", "IN_TRANSIT", []),
+                ("state_code", "SETTLED", []),
+                ("state_code", "VOID", []),
+            ],
+        )
+        self.assertIn("schema-derived values may cover", system_prompt)
 
     def test_local_intent_policy_stops_five_misroutes_before_transport(self) -> None:
         cases = {

@@ -15,6 +15,7 @@ from auditable_nl2sql import (
     DeepSeekSqlGenerator,
     ProviderConfigurationError,
     build_business_context,
+    collect_low_cardinality_values,
     build_schema_knowledge,
     load_business_knowledge,
     read_schema,
@@ -35,8 +36,8 @@ RESOURCE_NAMES = (
 MAIN_CONTEXTS_V3_SHA256 = (
     "29980F9AA5EC0B7AB2E727BC60E7CCAB7FA16EBA107E4D48052C58B57457ABEE"
 )
-HOLDOUT_NATIVE_CONTEXTS_V3_SHA256 = (
-    "F62CDCC0006ED9C3EC94D20D97741D27AEF2082B22AD17429D9F2C7DB36A27C7"
+HOLDOUT_VALUE_CONTEXTS_V3_SHA256 = (
+    "BCF8824D9ACFFE53A58219F081DCC2E109C3EA6CCD00856F89B77A6A4A96E219"
 )
 
 
@@ -97,9 +98,10 @@ class DatasourceGovernanceTests(unittest.TestCase):
         self.main_schema = _schema_snapshot(
             create_demo_database(root / "main.sqlite3")
         )
-        self.holdout_schema = _schema_snapshot(
-            create_schema_holdout_database(root / "holdout.sqlite3")
+        self.holdout_database = create_schema_holdout_database(
+            root / "holdout.sqlite3"
         )
+        self.holdout_schema = _schema_snapshot(self.holdout_database)
 
     def test_resources_are_physically_isolated_by_datasource(self) -> None:
         data_root = resources.files("auditable_nl2sql").joinpath("data")
@@ -163,12 +165,13 @@ class DatasourceGovernanceTests(unittest.TestCase):
         )
         self.assertEqual(
             _legacy_context_digest(holdout_contexts),
-            HOLDOUT_NATIVE_CONTEXTS_V3_SHA256,
+            HOLDOUT_VALUE_CONTEXTS_V3_SHA256,
         )
 
     def test_holdout_namespace_equals_deterministic_builder_artifacts(self) -> None:
         knowledge = load_business_knowledge(SCHEMA_HOLDOUT_DATASOURCE_ID)
         derived = build_schema_knowledge(self.holdout_schema)
+        collected = collect_low_cardinality_values(self.holdout_database)
 
         self.assertEqual(knowledge.datasource_id, SCHEMA_HOLDOUT_DATASOURCE_ID)
         self.assertEqual(
@@ -201,7 +204,17 @@ class DatasourceGovernanceTests(unittest.TestCase):
                 for note in derived.field_descriptions
             ],
         )
-        self.assertEqual(knowledge.enum_values, ())
+        self.assertEqual(
+            [
+                (value.reference, value.value, value.aliases)
+                for value in knowledge.enum_values
+            ],
+            [
+                (field.reference, value, ())
+                for field in collected.fields
+                for value in field.values
+            ],
+        )
         self.assertEqual(knowledge.training_pairs, ())
         self.assertTrue(
             all(

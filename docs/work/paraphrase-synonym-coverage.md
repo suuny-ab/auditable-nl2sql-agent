@@ -61,8 +61,10 @@ Revert 本切片提交即可删除新增别名、句式填充词、定向复测�
 - “销售额”知识条目只新增 `销售收入 / 销售总额 / 成交额 / 卖了多少钱`；既有意图规则只增加相同
   词项与 `请 / 给出 / 我想 / 知道 / 一共 / 总额` 填充词，函数分支、action、reason 与 rule ID
   没有变化；行为合同版本升为 `intent-policy-v3`。修复后全部红灯题与邻近题转绿。
-- 业务知识 / 意图 / 改述子合同 / 比较器 / 运行器定向 `35/35`；主库 16 条成功题和 4 条带范围的
-  邻近同义问题全部继续 Provider 路由。Python `3.13.12` 全量 114 项测试通过。
+- 业务知识 / 意图 / 改述子合同 / 比较器 / 运行器定向 `36/36`；主库 16 条成功题和 4 条带范围的
+  邻近同义问题全部继续 Provider 路由。Python `3.13.12` 全量 115 项测试通过。
+- 零 success 的三题子集将执行成功率记录为 `0/0, value=null`，而非失败；集成测试用拒绝网络的
+  transport 证明三题均由本地意图门终止、transport 调用 `0`、非成功执行 `0`。
 - Web 生产构建 / SSR `2/2`、编译、44 条锁依赖、两份 strict JSONL、改述 / 业务术语 strict JSON、
   园丁 current `9/0/0`、治理、Compose config、凭据模式、产品反向导入与差异门全绿。
 - 完整 Compose 本地验收确认进程 `10001:10001`、health `read_only=true`、固定 run 完成、POST 创建
@@ -72,7 +74,20 @@ Revert 本切片提交即可删除新增别名、句式填充词、定向复测�
 
 ## Single-run evaluation evidence
 
-待唯一复测完成后填写。
+- 冻结候选为 `74a99644b417ae88ec4f381321c825f30c120c04`；唯一轮次
+  `revenuepara3-20260802T181238Z` 的 business / checkpoint / report / 题集副本路径预先不存在，
+  只选择 `ambiguity-001-p1..p3`，自动重试 `0`，没有补跑、换题或调优。
+- 三题 workflow 各执行一次后均形成 `clarification_required + revenue-scope-required` checkpoint，
+  attempt count 均为 `0`，本地 policy receipt 均为 `provider_called=false`；真实 Provider 调用、usage、
+  prompt / completion / total token 均为 `0`。
+- 所选三题正确率 `0/3 → 3/3`，投影完整 30 题 `24/30 → 27/30`（`+3`）；非成功 SQL 执行
+  `3 → 0`，本轮越权和非成功执行均为 `0`，执行成功率因无 success 类案例记为 `0/0, value=null`。
+- 旧汇总器在三条 checkpoint 全部写完后因零分母退出；遵守不补跑边界，没有再次调用 `run()`，仅用
+  `WorkflowRunReader` 读取既有三条终态并经同一判分 / usage / metric 写出标准报告。该边界已有拒绝
+  网络的集成回归测试。
+- 业务库前后及当前 SHA-256 均为 `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`；
+  报告 SHA-256 为 `18801b7b7f0a4b3f6d50da63738ca348c87d1701d95116a9f0e3d0c70e6b491e`，
+  敏感模式命中 `0`。
 
 ## Remote evidence
 

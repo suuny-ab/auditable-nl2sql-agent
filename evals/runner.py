@@ -46,13 +46,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _metric(numerator: int, denominator: int) -> dict[str, int | float]:
-    if denominator <= 0:
-        raise EvaluationRunnerError("metric denominator must be positive")
+def _metric(numerator: int, denominator: int) -> dict[str, int | float | None]:
+    if denominator < 0 or numerator < 0 or numerator > denominator:
+        raise EvaluationRunnerError("metric counts are invalid")
     return {
         "numerator": numerator,
         "denominator": denominator,
-        "value": numerator / denominator,
+        "value": None if denominator == 0 else numerator / denominator,
     }
 
 

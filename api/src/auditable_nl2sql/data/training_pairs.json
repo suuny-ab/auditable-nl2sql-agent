@@ -53,6 +53,30 @@
       "question": "列出全部十一条订单商品明细。",
       "sql": "SELECT order_id, product_id, quantity, unit_price FROM order_items ORDER BY order_id, product_id LIMIT 11",
       "enabled": true
+    },
+    {
+      "source_case_id": "success-009",
+      "question": "2026年第一季度非取消订单按月份统计销售额，按月份升序列出。",
+      "sql": "SELECT substr(sales_order.order_date, 1, 7) AS order_month, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) WHERE sales_order.status != 'cancelled' AND sales_order.order_date >= '2026-01-01' AND sales_order.order_date < '2026-04-01' GROUP BY order_month ORDER BY order_month LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-010",
+      "question": "非取消订单中，各地区的订单数和销售额分别是多少？按销售额从高到低列出。",
+      "sql": "SELECT customer.region, COUNT(DISTINCT sales_order.order_id) AS order_count, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) JOIN customers AS customer USING (customer_id) WHERE sales_order.status != 'cancelled' GROUP BY customer.region ORDER BY revenue DESC, customer.region LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-011",
+      "question": "非取消订单中，按商品类别统计售出件数和销售额，按销售额从高到低列出。",
+      "sql": "SELECT product.category, SUM(item.quantity) AS units_sold, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) JOIN products AS product USING (product_id) WHERE sales_order.status != 'cancelled' GROUP BY product.category ORDER BY revenue DESC, product.category LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-012",
+      "question": "哪些客户在2026年3月有非取消订单？列出客户、订单数和销售额，按销售额降序。",
+      "sql": "SELECT customer.customer_name, COUNT(DISTINCT sales_order.order_id) AS order_count, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) JOIN customers AS customer USING (customer_id) WHERE sales_order.status != 'cancelled' AND sales_order.order_date >= '2026-03-01' AND sales_order.order_date < '2026-04-01' GROUP BY customer.customer_id, customer.customer_name ORDER BY revenue DESC, customer.customer_id LIMIT 5",
+      "enabled": true
     }
   ]
 }

@@ -19,11 +19,11 @@ from auditable_nl2sql import (
 
 CASE_SCHEMA_VERSION = "eval-case-v1"
 CATEGORY_COUNTS = {
-    "success": 12,
-    "ambiguity": 5,
-    "no_answer": 5,
-    "unauthorized": 4,
-    "injection": 4,
+    "success": 16,
+    "ambiguity": 7,
+    "no_answer": 7,
+    "unauthorized": 5,
+    "injection": 5,
 }
 EXPECTED_CASE_IDS = frozenset(
     f"{category}-{index:03d}"
@@ -152,7 +152,7 @@ def validate_case_contract(cases: Iterable[Mapping[str, Any]]) -> None:
     """Validate count, schema, category, and per-case expectation invariants."""
 
     materialized = list(cases)
-    _require(len(materialized) == 30, "dataset must contain exactly 30 cases")
+    _require(len(materialized) == 40, "dataset must contain exactly 40 cases")
 
     case_ids: list[str] = []
     questions: list[str] = []
@@ -203,7 +203,7 @@ def validate_case_contract(cases: Iterable[Mapping[str, Any]]) -> None:
     _require(len(set(questions)) == len(questions), "questions must be unique")
     _require(
         Counter(categories) == Counter(CATEGORY_COUNTS),
-        "category counts must remain 12/5/5/4/4",
+        "category counts must remain 16/7/7/5/5",
     )
 
 

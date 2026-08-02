@@ -4,16 +4,16 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `ready-local` |
+| `state` | `blocked-external-auth` |
 | 更新时间 | `2026-08-02` |
-| 当前切片 | `DOCKER-COMPOSE-READONLY-API-016`：Docker/Compose 本地闭环完成，待发布收口 |
+| 当前切片 | `DOCKER-COMPOSE-READONLY-API-016`：Docker/Compose 本地闭环完成，发布被 GitHub OAuth scope 阻断 |
 | 最近完成 | `READONLY-API-HEALTH-015`：PR #11 已 squash 合并，主分支 CI 通过 |
 | 做什么 | 固定依赖构建非 root 只读镜像，用 Compose 启动 health 与固定合成 run 回查 |
 | 不做什么 | 不部署服务器，不调 Provider，不做鉴权、网页、Caddy/TLS、GHCR 或真实数据 |
 | 完成门 | 本地已满足：镜像/Compose、health/run、双库哈希不变、只读安全姿态、55 项回归通过 |
 | 风险 | 当前只有本地容器证据；没有 TLS、鉴权、持久化写卷或服务器运行证明，不可称为已上线 |
 | 项目基线 | `main@2ce3c1c6`：PR #11 已 squash 合并；main CI run `30738237711` 成功 |
-| 阻碍 | 无工程阻碍；按本单授权待 push、Draft PR、精确 SHA 远端双 job CI 与 squash 合并 |
+| 阻碍 | `gh` 登录有效但 token 缺少 `workflow` scope；GitHub 拒绝含 CI workflow 的推送，远端分支/PR 均未创建 |
 
 ## 复用审查
 
@@ -60,6 +60,10 @@
   `.local` 跟踪文件均为 `0`。
 - CI 新增独立 `container` job，只构建和运行 Compose、验证相同合同并停止容器；不发布镜像、不
   部署、不读取凭据。本地绿色不等于远端 CI，远端证据须在 Draft PR 后补记。
+- 本地切片提交为 `1316421ce457e7718c508c2b2423489869f67b6c`，基于
+  `origin/main@2ce3c1c67e70e10b55d69d29f7346f146c6087bd`，仅领先 1 个提交。`gh auth status`
+  与 `gh api user` 确认账号 `suuny-ab` 有效，但 HTTPS 推送被 GitHub 以缺少 `workflow` scope
+  拒绝；SSH 只读探测也无可用公钥。远端 `agent/docker-compose-readonly-api` 分支和 PR 均不存在。
 - 本轮 Provider 调用、凭据读取、token 消耗、费用、服务器写入和公开部署均为 `0`。完整合同与
   Traceable 复用审查见
   [`docs/work/docker-compose-readonly-api.md`](work/docker-compose-readonly-api.md)。

@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .intent import INTENT_POLICY_SCHEMA_VERSION, classify_question_intent
 from .knowledge import BusinessKnowledgeError, build_business_context
 
 
@@ -221,6 +222,29 @@ class DeepSeekSqlGenerator:
     ) -> SqlGenerationResult:
         if not self._enabled:
             raise ProviderDisabledError()
+        if not isinstance(question, str) or not question.strip():
+            raise ProviderConfigurationError("Provider question must be non-empty")
+        if not isinstance(schema_snapshot, list) or not schema_snapshot:
+            raise ProviderConfigurationError("Provider schema snapshot must be non-empty")
+
+        try:
+            intent_decision = classify_question_intent(question)
+        except ValueError as exc:
+            raise ProviderConfigurationError("Provider question is invalid") from exc
+        if intent_decision is not None:
+            raise ProviderDecisionError(
+                intent_decision.action,
+                receipt={
+                    "schema_version": PROVIDER_RECEIPT_SCHEMA_VERSION,
+                    "provider": "local-intent-policy",
+                    "requested_model": self._model,
+                    "provider_called": False,
+                    "policy_schema_version": INTENT_POLICY_SCHEMA_VERSION,
+                    "policy_rule_id": intent_decision.rule_id,
+                    "action": intent_decision.action,
+                    "reason": intent_decision.reason,
+                },
+            )
         if self._transport is None:
             raise ProviderConfigurationError("Enabled Provider has no transport")
 

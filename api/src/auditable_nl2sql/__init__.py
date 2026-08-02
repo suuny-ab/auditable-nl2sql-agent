@@ -45,6 +45,13 @@ from .knowledge import (
     load_business_knowledge,
     retrieve_training_examples,
 )
+from .intent import (
+    INTENT_POLICY_SCHEMA_VERSION,
+    SYNTHETIC_ORDER_DATE_END,
+    SYNTHETIC_ORDER_DATE_START,
+    IntentDecision,
+    classify_question_intent,
+)
 from .provider import (
     DEEPSEEK_CHAT_COMPLETIONS_URL,
     DEEPSEEK_DEFAULT_MODEL,
@@ -113,6 +120,11 @@ __all__ = [
     "build_business_context",
     "load_business_knowledge",
     "retrieve_training_examples",
+    "INTENT_POLICY_SCHEMA_VERSION",
+    "SYNTHETIC_ORDER_DATE_END",
+    "SYNTHETIC_ORDER_DATE_START",
+    "IntentDecision",
+    "classify_question_intent",
     "DEEPSEEK_CHAT_COMPLETIONS_URL",
     "DEEPSEEK_DEFAULT_MODEL",
     "PROVIDER_RECEIPT_SCHEMA_VERSION",

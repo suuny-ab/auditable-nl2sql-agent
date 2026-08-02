@@ -28,3 +28,8 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
 执行成功率 `8/8`、答案正确率 `17/20`、人工介入率 `4/20`，20 次调用合计 `24379` tokens。
 业务库哈希不变且越权执行为 `0`；完整前后对比、剩余错误和报告哈希见
 [`docs/work/training-pair-frozen-eval.md`](../docs/work/training-pair-frozen-eval.md)。
+
+三条确定性意图规则加入后的唯一复跑 `intentfix-20260802T142421Z` 得到执行成功率 `8/8`、答案
+正确率 `20/20`、人工介入率 `4/20`；三条本地终止使真实 Provider 调用降为 `17`，自动重试仍为
+`0`，合计 `20821` tokens。越权与非成功类别 SQL 执行均为 `0`；完整边界见
+[`docs/work/intent-routing-fix.md`](../docs/work/intent-routing-fix.md)。

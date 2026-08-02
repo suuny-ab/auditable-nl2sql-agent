@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -66,6 +67,26 @@ def check_governance() -> list[str]:
         marker_owners = sorted(path for path, text in documents.items() if marker in text)
         if marker_owners != [AUTHORIZATION_OWNER]:
             errors.append(f"authorization_tier_owner_invalid:{marker}:{marker_owners}")
+    gardener = subprocess.run(
+        [
+            sys.executable,
+            "tools/doc_gardener.py",
+            "--scope",
+            "current",
+            "--format",
+            "json",
+            "--fail-on",
+            "stale",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if gardener.returncode != 0:
+        detail = (gardener.stdout + gardener.stderr).strip().replace("\n", " ")
+        errors.append(f"doc_gardener_gate_failed:{detail}")
     return errors
 
 
@@ -79,7 +100,8 @@ def main() -> int:
     line_count = len(AGENTS_PATH.read_text(encoding="utf-8").splitlines())
     print(
         "governance_check=passed "
-        f"agents_lines={line_count} authorization_owner={AUTHORIZATION_OWNER}"
+        f"agents_lines={line_count} authorization_owner={AUTHORIZATION_OWNER} "
+        "doc_gardener_stale=0"
     )
     return 0
 

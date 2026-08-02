@@ -35,6 +35,8 @@ jobs:
           --require-hashes --requirement api/requirements-base.lock
       - name: Compile product package
         run: python -m compileall -q api/src
+      - name: Run documentation current-state gate
+        run: python tools/doc_gardener.py --scope current --fail-on stale
       - name: Run product tests
         run: python -m unittest discover -s api/tests -p "test_*.py" -v
 

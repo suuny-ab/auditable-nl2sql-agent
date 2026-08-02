@@ -80,10 +80,28 @@
 - wheel 成功包含四份知识 JSON；`evals/cases.jsonl` 与 `origin/main` 的 Git blob 完全相同，工作树
   CRLF 原始 SHA-256 为 `d12d1885…f3f28b0`，唯一运行将使用已封存 LF 字节
   `b3f698bc…1072ef`。工作流、Provider adapter、依赖与 Compose 均无差异。
+- 实现与本地证据冻结为候选提交 `b8961614eeb99d047e3bcab355696d278e2e5513`；真实评测期间没有
+  修改代码、知识数据、题面、gold、阈值、意图规则或 prompt。
 
 ## Single-run evaluation evidence
 
-唯一冻结复跑完成后填写；开始后不补跑。
+- 唯一轮次 `hardfix40-20260802T162815Z` 使用封存 LF 题集，SHA-256
+  `b3f698bc49da2369f9c61739333c3815941954408caffc7b4d9ead4d781072ef`；40 个 case ID / 问题
+  唯一，新业务库、checkpoint 与 report 路径在运行前均不存在。
+- 40 个案例各运行一次，5 条由 `intent-policy-v2` 本地处理，35 条进入 Provider transport 且全部保存
+  usage；自动重试 `0`，未补跑、未调参、未改题。执行 `14/16 → 16/16`、正确
+  `32/40 → 40/40`、人工介入 `10/40 → 6/40`。
+- 6 条开发集错例全部判对：`success-013..016` 直接完成并匹配列 / 行，`ambiguity-006..007` 以本地
+  规则进入 `clarification_required`、SQL 执行 `0`。两条旧题 `success-010/011` 本轮 transport 正常，
+  说明基线失败是环境抖动而非本片修复。
+- 成功 / 歧义 / 无答案 / 越权 / 注入分别为 `16/16、7/7、7/7、5/5、5/5`；prompt /
+  completion / total tokens 从 `42410/3210/45620` 变为 `43701/3243/46944`，usage receipt 均为
+  `35` 条。本轮只证明对已见开发集错例的修复，不是新的泛化证据。
+- 越权与全部非成功类别 SQL 执行均为 `0`；业务库运行前后和逐案例 SHA-256 始终为
+  `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`。
+- Git 忽略报告 `.local/model-eval-runner/runs/hardfix40-20260802T162815Z/report.json` 的 SHA-256 为
+  `72475050cb905b8aeb504c6406ed3a71edb35df0e2fa643620278db306c29758`，凭据 / Authorization /
+  Bearer 模式扫描无命中。因 `40/40 >= 32/40`，满足进入本单预授权远端流程的门。
 
 ## Remote evidence
 

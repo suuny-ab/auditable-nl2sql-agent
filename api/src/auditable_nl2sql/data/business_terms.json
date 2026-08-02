@@ -3,7 +3,7 @@
   "terms": [
     {
       "term": "销售额",
-      "synonyms": ["营收", "收入", "GMV"],
+      "synonyms": ["营收", "收入", "GMV", "销售收入", "销售总额", "成交额", "卖了多少钱"],
       "definition": "订单商品明细的 quantity 乘以 unit_price 后求和；默认排除 cancelled 订单。",
       "related_fields": ["order_items.quantity", "order_items.unit_price", "orders.order_id", "orders.status"]
     },

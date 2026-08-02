@@ -7,18 +7,33 @@ from dataclasses import dataclass
 from datetime import date
 
 
-INTENT_POLICY_SCHEMA_VERSION = "intent-policy-v2"
+INTENT_POLICY_SCHEMA_VERSION = "intent-policy-v3"
 SYNTHETIC_ORDER_DATE_START = date(2026, 1, 5)
 SYNTHETIC_ORDER_DATE_END = date(2026, 3, 16)
 
 _YEAR_PATTERN = re.compile(r"(?<!\d)(20\d{2})(?!\d)")
-_REVENUE_TERMS = ("销售额", "营收", "收入", "gmv")
+_REVENUE_TERMS = (
+    "销售额",
+    "营收",
+    "收入",
+    "gmv",
+    "销售收入",
+    "销售总额",
+    "成交额",
+    "卖了多少钱",
+)
 _GENERIC_REVENUE_FILLERS = (
     "请问",
+    "请",
     "帮我",
+    "给出",
+    "我想",
+    "知道",
     "查询",
     "查一下",
     "一下",
+    "一共",
+    "总额",
     "的",
     "是",
     "有",

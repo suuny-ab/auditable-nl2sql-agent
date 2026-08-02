@@ -64,6 +64,18 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
   --output <report.json>
 ```
 
+销售额同义词修复后的定向复测复用同一冻结文件，但合同只放行上一轮掉分的
+`ambiguity-001-p1..p3`；它不重跑或重写其余 27 题：
+
+```powershell
+$env:PYTHONPATH='api/src'
+python -m evals.runner --provider deepseek --evaluation-id <run-id> `
+  --dataset evals/paraphrase_cases.json --dataset-contract paraphrase-revenue-v1 `
+  --business-database <business.sqlite3> `
+  --checkpoint-database <workflow.sqlite3> `
+  --output <report.json>
+```
+
 首次固定 20 条 DeepSeek 基线已完成：执行成功率 `7/8`、答案正确率 `14/20`、人工介入率
 `7/20`，20 次调用合计 `19231` tokens，自动重试为 `0`。这是单次冻结合成集结果，不代表生产
 可靠性；完整判定与安全回执见 [`docs/work/model-eval-runner.md`](../docs/work/model-eval-runner.md)。

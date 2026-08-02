@@ -293,6 +293,24 @@ class BusinessKnowledgeTests(unittest.TestCase):
         self.assertNotIn("products.list_price", references)
         self.assertNotIn("customers.segment", references)
 
+    def test_revenue_synonyms_cover_formal_colloquial_and_neighboring_phrases(self) -> None:
+        questions_and_aliases = (
+            ("请给出销售收入总额。", "销售收入"),
+            ("一共卖了多少钱？", "卖了多少钱"),
+            ("请问成交额。", "成交额"),
+            ("我想知道销售总额。", "销售总额"),
+        )
+
+        for question, expected_alias in questions_and_aliases:
+            with self.subTest(question=question):
+                context = build_business_context(question, self.schema)
+                revenue = next(
+                    term
+                    for term in context["matched_terms"]
+                    if term["term"] == "销售额"
+                )
+                self.assertIn(expected_alias, revenue["matched_by"])
+
     def test_enum_value_matches_are_stable_and_require_an_available_field(self) -> None:
         question = "华东地区已完成订单有多少笔？"
         context = build_business_context(question, self.schema)

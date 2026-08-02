@@ -9,11 +9,15 @@ from pathlib import Path
 from auditable_nl2sql.demo import create_demo_database
 from evals.contract import DatasetContractError, validate_reference_cases
 from evals.paraphrase import (
+    REVENUE_RERUN_CASE_IDS,
     REWRITE_STYLES,
     SOURCE_BASELINE_CORRECTNESS,
     load_paraphrase_cases,
+    load_revenue_paraphrase_rerun_cases,
     summarize_paraphrase_report,
+    summarize_revenue_paraphrase_rerun,
     validate_paraphrase_case_contract,
+    validate_revenue_paraphrase_rerun_contract,
 )
 
 
@@ -93,6 +97,46 @@ class ParaphraseEvaluationContractTests(unittest.TestCase):
         )
         self.assertEqual(comparison["dropped_variants"], ["success-001-p1"])
         self.assertEqual(comparison["improved_variants"], ["success-013-p1"])
+
+    def test_revenue_rerun_contract_selects_only_the_three_frozen_drops(self) -> None:
+        cases = load_revenue_paraphrase_rerun_cases(DATASET_PATH)
+
+        validate_revenue_paraphrase_rerun_contract(cases)
+
+        self.assertEqual({case["case_id"] for case in cases}, REVENUE_RERUN_CASE_IDS)
+        self.assertTrue(all(case["source_case_id"] == "ambiguity-001" for case in cases))
+        changed = copy.deepcopy(cases)
+        changed[0]["case_id"] = "ambiguity-006-p1"
+        with self.assertRaises(DatasetContractError):
+            validate_revenue_paraphrase_rerun_contract(changed)
+
+    def test_revenue_rerun_comparison_projects_only_selected_improvements(self) -> None:
+        report = {
+            "evaluation_id": "revenue-rerun-test",
+            "cases": [
+                {
+                    "case_id": case_id,
+                    "adjudication": {"answer_correct": True},
+                }
+                for case_id in sorted(REVENUE_RERUN_CASE_IDS)
+            ],
+        }
+
+        comparison = summarize_revenue_paraphrase_rerun(report)
+
+        self.assertEqual(
+            comparison["baseline"]["full_answer_correctness"],
+            {"numerator": 24, "denominator": 30},
+        )
+        self.assertEqual(
+            comparison["rerun"]["selected_answer_correctness"],
+            {"numerator": 3, "denominator": 3},
+        )
+        self.assertEqual(
+            comparison["rerun"]["projected_full_answer_correctness"],
+            {"numerator": 27, "denominator": 30},
+        )
+        self.assertEqual(comparison["rerun"]["correctness_delta"], 3)
 
 
 if __name__ == "__main__":

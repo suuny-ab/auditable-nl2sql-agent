@@ -26,6 +26,13 @@ class GovernanceContractTests(unittest.TestCase):
             "authorization_owner=docs/engineering/review.md",
             result.stdout,
         )
+        self.assertIn("doc_gardener_stale=0", result.stdout)
+        workflow = (PROJECT_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertIn("Run documentation current-state gate", workflow)
+        self.assertIn(
+            "python tools/doc_gardener.py --scope current --fail-on stale",
+            workflow,
+        )
 
 
 if __name__ == "__main__":

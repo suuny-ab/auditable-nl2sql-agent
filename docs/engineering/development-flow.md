@@ -27,6 +27,9 @@
 - 先运行最便宜的相关测试，再按风险补集成或容器验证。测试至少覆盖成功路径和对应失败关闭；
   安全测试同时证明动作被拒绝且状态未修改。
 - 机器能稳定判断的合同写入测试或检查脚本；文档链接结果，不复制另一套会漂移的机器事实。
+- 文档当前态防腐门运行 `python tools/doc_gardener.py --scope current --fail-on stale`；手动全扫用
+  `python tools/doc_gardener.py --scope all --format markdown`。园丁只报告不改写，`review` 项须人工
+  对照 `PROJECT.md` 与 `docs/status.md` 裁决。
 - 完成前运行相关测试、`compileall`、依赖检查和 `git diff --check`；确认未跟踪密钥、运行数据库、
   构建产物、模型权重或私有评测材料。
 

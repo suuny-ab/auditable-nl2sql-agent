@@ -1,5 +1,6 @@
 """Auditable NL2SQL product package."""
 
+from .api import RunReader, create_app
 from .answer import ANSWER_SCHEMA_VERSION, AnswerCompositionError, compose_answer
 from .database import (
     ColumnSchema,
@@ -46,6 +47,7 @@ from .workflow import (
     RunNotFoundError,
     StaticSqlGenerator,
     UnsupportedQuestionError,
+    WorkflowRunReader,
     WorkflowRunner,
 )
 
@@ -53,6 +55,8 @@ __all__ = [
     "ANSWER_SCHEMA_VERSION",
     "AnswerCompositionError",
     "compose_answer",
+    "RunReader",
+    "create_app",
     "ColumnSchema",
     "ForeignKeySchema",
     "QueryExecutionError",
@@ -91,5 +95,6 @@ __all__ = [
     "RunNotFoundError",
     "StaticSqlGenerator",
     "UnsupportedQuestionError",
+    "WorkflowRunReader",
     "WorkflowRunner",
 ]

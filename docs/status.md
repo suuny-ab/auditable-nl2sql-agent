@@ -5,15 +5,15 @@
 | 字段 | 内容 |
 | --- | --- |
 | `state` | `ready` |
-| 更新时间 | `2026-08-01` |
-| 当前切片 | `MODEL-EVAL-RUNNER-013`：已完成 20 条单次真实基线、结构化报告与三个固定指标 |
-| 最近完成 | `PROVIDER-DECISION-CONTRACT-012`：五类严格 action、稳定终态与越权审批路由 |
-| 做什么 | 冻结 20 条各调用一次；保存逐案例 trajectory/usage；计算并核验三个指标 |
-| 不做什么 | 不改产品合同或 prompt，不做 API/网页/Docker，不重试或重复刷分，不新增依赖 |
-| 完成门 | 已满足：20/20 回执、三项指标、越权执行 0、逐案例业务库哈希不变、自动重试 0 |
-| 风险 | 首次基线答案正确率为 `14/20`；2 条非成功类别被误路由并执行只读 SQL，需保留为真实误差 |
-| 项目基线 | Draft PR #9：`codex/model-eval-runner` → `main@0e960289`；implementation head `91aaa20` |
-| 阻碍 | 无工程阻碍；Draft PR #9 等待评审，本轮不转 Ready、不合并 |
+| 更新时间 | `2026-08-02` |
+| 当前切片 | `FASTAPI-READONLY-QUERY-014`：已完成只读任务摘要列表和完整 run/trajectory 回查 |
+| 最近完成 | `MODEL-EVAL-RUNNER-013`：20 条单次真实基线、结构化报告与三个固定指标 |
+| 做什么 | 提供 `GET /api/v1/runs` 与 `GET /api/v1/runs/{run_id}`，复用稳定 run record |
+| 不做什么 | 不创建或审批 run，不调 Provider，不做启动装配、鉴权、网页、Docker 或部署 |
+| 完成门 | 已满足：列表/详情、404/422/405、checkpoint 机械只读、双库哈希不变、全量回归通过 |
+| 风险 | 当前只交付注入 reader 的 FastAPI app factory；独立服务启动与身份权限仍待实现 |
+| 项目基线 | `main@6899b9e9`：PR #9 已 squash 合并，主分支 CI 通过 |
+| 阻碍 | 无工程阻碍；本切片尚未推送或获得远端 CI 证据 |
 
 ## 复用审查
 
@@ -41,6 +41,21 @@
 - [PR #1](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/1) 已合并为 `63381f9`；
   [main CI run 30684609206](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30684609206)
   在该 SHA 上完成，结论为 `success`。
+
+## FASTAPI-READONLY-QUERY-014 验证证据
+
+- `GET /api/v1/runs` 返回 `run-list-v1` 的稳定任务摘要和有界分页；
+  `GET /api/v1/runs/{run_id}` 直接返回包含完整 trajectory 的 `run-record-v5`。
+- 合法缺失 run 返回 `404`，非法 run ID 和分页返回 `422`，向两条路由发送 `POST` 返回
+  `405`；应用未注册创建、审批、Provider 或数据库写入接口。
+- 专用 `WorkflowRunReader` 以 SQLite `mode=ro + query_only` 打开既有 checkpoint，不暴露
+  `run/decide`；底层写入尝试被 `readonly` 拒绝，缺失 checkpoint 不会被读取动作创建。
+- 写入 runner 关闭后再构造 reader；构造前后、列表/详情/失败请求前后，合成业务库和 checkpoint
+  SQLite 的 SHA-256 均不变，已有完成与挂起 run 的状态、trajectory 和执行次数不变。
+- FastAPI `0.139.2` 已精确固定并写入 hash lock。Python `3.13.12` API 定向 4 项、全量 49 项
+  测试通过；`compileall`、`pip check`、`git diff --check`、`.local` 跟踪和产品依赖方向检查通过。
+- 本轮 Provider 调用、凭据读取和 token 消耗均为 `0`。完整合同见
+  [`docs/work/fastapi-readonly-query.md`](work/fastapi-readonly-query.md)。
 
 ## RESULT-EVIDENCE-006 验证证据
 
@@ -211,9 +226,9 @@
 
 ## 当前检查点
 
-评测运行器与首次真实 20 条固定基线均已完成并发布为 Draft PR #9；保留
-`7/8`、`14/20`、`7/20` 原始基线，不做 prompt 调优或补跑。下一步是评审与合并；合并后再决定
-是否进入 FastAPI 的只读任务/轨迹查询最小切片。
+FastAPI 只读查询核心已在本地完成；保留首次真实 20 条基线的 `7/8`、`14/20`、`7/20`，不做
+prompt 调优或补跑。下一候选是可独立启动的只读 API 装配与 health 最小切片；尚未开工，需先
+完成新的开工三问与风险判断。
 
 ## 审批中断/恢复最小风险探针
 

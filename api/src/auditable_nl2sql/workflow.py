@@ -44,6 +44,7 @@ CANONICAL_SQL = (
     "AND sales_order.order_date < '2026-04-01'"
 )
 RUN_RECORD_SCHEMA_VERSION = "run-record-v5"
+RUN_LIST_SCHEMA_VERSION = "run-list-v1"
 DEFAULT_APPROVAL_ROW_LIMIT = 5
 DEFAULT_RESULT_ROW_LIMIT = 100
 _PROVIDER_TERMINAL_STATUSES = {
@@ -783,6 +784,7 @@ class WorkflowRunner:
         generator: SqlGenerator | None = None,
         approval_row_limit: int = DEFAULT_APPROVAL_ROW_LIMIT,
         max_result_rows: int = DEFAULT_RESULT_ROW_LIMIT,
+        _checkpoint_read_only: bool = False,
     ) -> None:
         if type(approval_row_limit) is not int or approval_row_limit <= 0:
             raise ValueError("approval_row_limit must be a positive integer")
@@ -792,22 +794,48 @@ class WorkflowRunner:
         self._checkpoint_database = Path(checkpoint_database).resolve()
         if self._business_database == self._checkpoint_database:
             raise ValueError("business and checkpoint databases must be different files")
-        self._checkpoint_database.parent.mkdir(parents=True, exist_ok=True)
+        self._checkpoint_read_only = _checkpoint_read_only
+        if _checkpoint_read_only:
+            if not self._checkpoint_database.is_file():
+                raise ValueError("checkpoint database must already exist")
+        else:
+            self._checkpoint_database.parent.mkdir(parents=True, exist_ok=True)
         self._max_result_rows = max_result_rows
-        self._connection = sqlite3.connect(
-            self._checkpoint_database,
-            check_same_thread=False,
-        )
+        if _checkpoint_read_only:
+            checkpoint_uri = f"{self._checkpoint_database.as_uri()}?mode=ro"
+            self._connection = sqlite3.connect(
+                checkpoint_uri,
+                uri=True,
+                check_same_thread=False,
+            )
+            self._connection.execute("PRAGMA query_only = ON")
+            checkpoint_tables = {
+                row[0]
+                for row in self._connection.execute(
+                    "SELECT name FROM sqlite_schema WHERE type = 'table'"
+                )
+            }
+            if not {"checkpoints", "writes"}.issubset(checkpoint_tables):
+                self._connection.close()
+                raise ValueError("checkpoint database has an unsupported schema")
+        else:
+            self._connection = sqlite3.connect(
+                self._checkpoint_database,
+                check_same_thread=False,
+            )
         serializer = JsonPlusSerializer(
             pickle_fallback=False,
             allowed_msgpack_modules=[],
         )
         try:
+            self._checkpointer = SqliteSaver(self._connection, serde=serializer)
+            if _checkpoint_read_only:
+                self._checkpointer.is_setup = True
             self._graph = _build_graph(
                 business_database=self._business_database,
                 generator=generator or StaticSqlGenerator(),
                 approval_row_limit=approval_row_limit,
-                checkpointer=SqliteSaver(self._connection, serde=serializer),
+                checkpointer=self._checkpointer,
             )
         except Exception:
             self._connection.close()
@@ -828,6 +856,8 @@ class WorkflowRunner:
 
     def run(self, *, run_id: str, question: str) -> dict[str, Any]:
         self._ensure_open()
+        if self._checkpoint_read_only:
+            raise RuntimeError("read-only workflow access cannot create runs")
         normalized_run_id = self._validate_run_id(run_id)
         normalized_question = question.strip()
         if not normalized_question:
@@ -861,6 +891,8 @@ class WorkflowRunner:
         approved: bool,
     ) -> dict[str, Any]:
         self._ensure_open()
+        if self._checkpoint_read_only:
+            raise RuntimeError("read-only workflow access cannot decide runs")
         normalized_run_id = self._validate_run_id(run_id)
         normalized_decision_id = self._validate_decision_id(decision_id)
         if type(approved) is not bool:
@@ -899,6 +931,37 @@ class WorkflowRunner:
         checkpoint_count = sum(1 for _ in self._graph.get_state_history(config))
         return self._project(snapshot.values, checkpoint_count=checkpoint_count)
 
+    def list_runs(self, *, limit: int = 20, offset: int = 0) -> dict[str, Any]:
+        """Return stable run summaries without exposing checkpoint internals."""
+        self._ensure_open()
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("limit must be an integer between 1 and 100")
+        if type(offset) is not int or offset < 0:
+            raise ValueError("offset must be a non-negative integer")
+
+        with self._checkpointer.cursor(transaction=False) as cursor:
+            total = cursor.execute(
+                "SELECT COUNT(DISTINCT thread_id) FROM checkpoints "
+                "WHERE checkpoint_ns = ''"
+            ).fetchone()[0]
+            rows = cursor.execute(
+                "SELECT thread_id, MAX(checkpoint_id) AS latest_checkpoint_id "
+                "FROM checkpoints WHERE checkpoint_ns = '' "
+                "GROUP BY thread_id "
+                "ORDER BY latest_checkpoint_id DESC, thread_id ASC "
+                "LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+
+        items = [self._summarize(self.get_run(row[0])) for row in rows]
+        return {
+            "schema_version": RUN_LIST_SCHEMA_VERSION,
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
     def _ensure_open(self) -> None:
         if self._closed:
             raise RuntimeError("workflow runner is closed")
@@ -927,6 +990,20 @@ class WorkflowRunner:
     @staticmethod
     def _config(run_id: str) -> dict[str, dict[str, str]]:
         return {"configurable": {"thread_id": run_id}}
+
+    @staticmethod
+    def _summarize(record: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "run_id": record["run_id"],
+            "question": record["question"],
+            "status": record["status"],
+            "provider_action": record.get("provider_action"),
+            "attempt_count": record.get("attempt_count", 0),
+            "error_code": record.get("error_code"),
+            "approval_required": record.get("approval") is not None,
+            "trajectory_length": len(record.get("trajectory", [])),
+            "checkpoint_count": record["checkpoint_count"],
+        }
 
     @staticmethod
     def _project(state: Mapping[str, Any], *, checkpoint_count: int) -> dict[str, Any]:
@@ -964,3 +1041,33 @@ class WorkflowRunner:
             "checkpoint_count": checkpoint_count,
         }
         return json.loads(json.dumps(record, allow_nan=False, ensure_ascii=False))
+
+
+class WorkflowRunReader:
+    """Mechanically read-only access to existing workflow records."""
+
+    def __init__(
+        self,
+        business_database: str | Path,
+        checkpoint_database: str | Path,
+    ) -> None:
+        self._runner = WorkflowRunner(
+            business_database,
+            checkpoint_database,
+            _checkpoint_read_only=True,
+        )
+
+    def __enter__(self) -> WorkflowRunReader:
+        return self
+
+    def __exit__(self, _exc_type: Any, _exc: Any, _traceback: Any) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self._runner.close()
+
+    def get_run(self, run_id: str) -> dict[str, Any]:
+        return self._runner.get_run(run_id)
+
+    def list_runs(self, *, limit: int = 20, offset: int = 0) -> dict[str, Any]:
+        return self._runner.list_runs(limit=limit, offset=offset)

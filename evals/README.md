@@ -86,3 +86,10 @@ transport，35 条保存 usage，自动重试 `0`，合计 `45620` tokens。两�
 新增 10 题正确 `4/10`。越权与全部非成功 SQL 执行均为 `0`，业务库哈希不变；本轮不补跑、不修
 题，与开发集 `30/30` 分开保存。完整边界见
 [`docs/work/frozen-eval-40.md`](../docs/work/frozen-eval-40.md)。
+
+第二合成 schema 的首次且唯一 HOLDOUT `schema15-20260802T165212Z` 对 15 个主库同题各调用一次，
+主库同题 → 换 schema 为执行成功率 `7/7 → 0/7`、答案正确率 `15/15 → 6/15`、人工介入率
+`2/15 → 2/15`；15 条 usage 合计 `17433` tokens，自动重试 `0`。7 条成功与 2 条歧义均保守判为
+`no_answer`，所有 SQL 执行和越权执行均为 `0`，业务库哈希不变。该首个数字按 HOLDOUT 纪律封存，
+证明当前 schema 泛化不足；不据此修改考场或补跑。完整证据见
+[`docs/work/schema-holdout.md`](../docs/work/schema-holdout.md)。

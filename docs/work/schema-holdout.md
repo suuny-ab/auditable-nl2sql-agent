@@ -84,7 +84,22 @@
 
 ## Single-run HOLDOUT evidence
 
-首次完整运行后填写；开始后不得修改冻结资产或补跑。
+- 候选先冻结为 `69914a13305665a2ee4428f1128f94e3c58ba8ed`；唯一轮次
+  `schema15-20260802T165212Z` 的输入 SHA-256 为 `3a598167…7bb16`、第二库为
+  `ed9a2cda…78143d`，15 个 ID / 问题唯一，新 checkpoint / report 路径预先不存在。
+- 15 个问题各进入 Provider transport 一次并保存 usage；transport 失败 `0`、自动重试 `0`，未补跑、
+  未调参、未修改 schema / 数据 / 问题 / gold / 知识 / 训练对 / prompt / 工作流。
+- 主库同题 → 换 schema HOLDOUT：执行 `7/7 → 0/7`、正确 `15/15 → 6/15`、介入
+  `2/15 → 2/15`。主库同题 / HOLDOUT 的 prompt、completion、total tokens 分别为
+  `19192/1541/20733 → 16434/999/17433`，两边均为 15 条 usage。
+- 成功 / 歧义 / 无答案 / 越权 / 注入正确数为 `0/7、0/2、2/2、2/2、2/2`。7 条成功和 2 条
+  歧义都被判为 `no_answer`，在 SQL 生成前保守终止；这证明当前上下文没有把熟题能力迁移到陌生
+  schema，也没有用错误 SQL 冒进执行。
+- 越权与全部非成功 SQL 执行均为 `0`，实际所有 15 题 SQL 执行均为 `0`；业务库逐案例和整轮前后
+  SHA-256 始终为 `ed9a2cda873588525d5637f6708209348d62b63d31c265cc1471c5acdc78143d`。
+- Git 忽略报告 `.local/model-eval-runner/runs/schema15-20260802T165212Z/report.json` 的 SHA-256
+  为 `c3fe554c920c4fb8fba917623531858f20f3bd5d914c092dfbfb63a37eee15c8`，凭据 /
+  Authorization / Bearer 模式扫描无命中。`6/15` 是本 HOLDOUT 的首次且最终基线，不因低分调优。
 
 ## Remote evidence
 

@@ -77,6 +77,11 @@ from .schema_knowledge import (
     SchemaKnowledgeError,
     build_schema_knowledge,
 )
+from .schema_summary import (
+    SCHEMA_SUMMARY_SCHEMA_VERSION,
+    SchemaSummaryError,
+    build_schema_summary,
+)
 from .workflow import (
     CANONICAL_QUESTION,
     CANONICAL_SQL,
@@ -157,6 +162,9 @@ __all__ = [
     "SchemaFieldDescription",
     "SchemaKnowledgeError",
     "build_schema_knowledge",
+    "SCHEMA_SUMMARY_SCHEMA_VERSION",
+    "SchemaSummaryError",
+    "build_schema_summary",
     "CANONICAL_QUESTION",
     "CANONICAL_SQL",
     "DEFAULT_APPROVAL_ROW_LIMIT",

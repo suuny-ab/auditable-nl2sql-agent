@@ -4,6 +4,8 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from auditable_nl2sql import SERVICE_VERSION
+
 
 API_ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,6 +14,11 @@ class DependencyContractTests(unittest.TestCase):
     def test_pyproject_direct_dependencies_match_requirements_input_and_lock(self) -> None:
         pyproject = tomllib.loads((API_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         project_dependencies = set(pyproject["project"]["dependencies"])
+        self.assertEqual(SERVICE_VERSION, pyproject["project"]["version"])
+        self.assertEqual(
+            pyproject["project"]["scripts"]["auditable-nl2sql-api"],
+            "auditable_nl2sql.server:main",
+        )
         requirements = {
             line.strip()
             for line in (API_ROOT / "requirements-base.txt")

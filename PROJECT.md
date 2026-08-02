@@ -73,10 +73,12 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
 - FastAPI 只读查询核心提供运行摘要列表和按 run ID 的完整 `run-record-v5` 回查；专用 reader
   以 SQLite `mode=ro + query_only` 读取既有 checkpoint，不暴露创建 run 或审批能力。缺失、非法
   和错误 HTTP 方法有稳定失败响应，查询前后业务库与 checkpoint 哈希不变。
-- 离线工作流核心、审批门、结果证据、确定性回答、固定评测合同、Provider 探针和正式 Provider
-  adapter 已分别由 PR #1 至 PR #8 合并到 `main`；PR #8 merge commit `0e960289` 的远端 CI
-  通过。模型评测运行器和首次基线回执已发布为 Draft PR #9，等待评审与合并。
+- 只读 API 可由 Uvicorn 在独立进程启动；版本化 health 返回服务版本与 `read_only=true`，
+  lifespan 复用并关闭专用 reader。默认仅监听 `127.0.0.1`，缺失数据库时失败且不创建文件。
+- 离线工作流核心、审批门、结果证据、确定性回答、固定评测合同、Provider 探针、正式 Provider
+  adapter、模型评测和只读查询 API 已由 PR #1 至 PR #10 合并到 `main`；PR #10 merge commit
+  `c1beba48` 的远端 CI 通过。独立启动与 health 仍只在本地分支，尚无远端 CI 证据。
 
-独立未见集评测、真实身份权限、可独立启动的 API 装配、网页和 Docker 仍待实现。当前 answer
+独立未见集评测、真实身份权限、网页和 Docker 仍待实现。当前 answer
 是确定性结果投影；evidence 指纹不是数字签名，也不证明 SQL 的业务语义正确。首次 20 条基线
 只代表该冻结合成集上的单次结果，不代表生产可靠性。

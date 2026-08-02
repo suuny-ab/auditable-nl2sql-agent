@@ -1,6 +1,11 @@
 """Auditable NL2SQL product package."""
 
-from .api import RunReader, create_app
+from .api import (
+    HEALTH_SCHEMA_VERSION,
+    SERVICE_VERSION,
+    RunReader,
+    create_app,
+)
 from .answer import ANSWER_SCHEMA_VERSION, AnswerCompositionError, compose_answer
 from .database import (
     ColumnSchema,
@@ -57,6 +62,8 @@ __all__ = [
     "compose_answer",
     "RunReader",
     "create_app",
+    "HEALTH_SCHEMA_VERSION",
+    "SERVICE_VERSION",
     "ColumnSchema",
     "ForeignKeySchema",
     "QueryExecutionError",

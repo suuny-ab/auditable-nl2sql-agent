@@ -100,6 +100,22 @@ class ReadOnlyApiTests(unittest.IsolatedAsyncioTestCase):
         second_page = second_page.json()
         self.assertEqual(second_page["items"][0]["run_id"], "completed-run")
 
+    async def test_health_reports_versioned_read_only_service(self) -> None:
+        response = await self.client.get("/api/v1/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "schema_version": "health-v1",
+                "status": "ok",
+                "version": "0.1.0.dev0",
+                "read_only": True,
+            },
+        )
+        rejected = await self.client.post("/api/v1/health")
+        self.assertEqual(rejected.status_code, 405)
+
     async def test_detail_reuses_complete_run_record_and_maps_errors(self) -> None:
         response = await self.client.get("/api/v1/runs/completed-run")
 

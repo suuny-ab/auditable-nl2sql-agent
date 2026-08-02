@@ -4,16 +4,16 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `ready` |
+| `state` | `ready-local` |
 | 更新时间 | `2026-08-02` |
-| 当前切片 | `FASTAPI-READONLY-QUERY-014`：已完成只读任务摘要列表和完整 run/trajectory 回查 |
-| 最近完成 | `MODEL-EVAL-RUNNER-013`：20 条单次真实基线、结构化报告与三个固定指标 |
-| 做什么 | 提供 `GET /api/v1/runs` 与 `GET /api/v1/runs/{run_id}`，复用稳定 run record |
-| 不做什么 | 不创建或审批 run，不调 Provider，不做启动装配、鉴权、网页、Docker 或部署 |
-| 完成门 | 已满足：列表/详情、404/422/405、checkpoint 机械只读、双库哈希不变、全量回归通过 |
-| 风险 | 当前只交付注入 reader 的 FastAPI app factory；独立服务启动与身份权限仍待实现 |
-| 项目基线 | `main@6899b9e9`：PR #9 已 squash 合并，主分支 CI 通过 |
-| 阻碍 | 无工程阻碍；本切片尚未推送或获得远端 CI 证据 |
+| 当前切片 | `READONLY-API-HEALTH-015`：独立启动装配与版本化只读 health 已在本地完成 |
+| 最近完成 | `FASTAPI-READONLY-QUERY-014`：PR #10 已 squash 合并，主分支 CI 通过 |
+| 做什么 | 用 Uvicorn 独立启动现有只读 API，提供 `GET /api/v1/health`，lifespan 管理 reader |
+| 不做什么 | 不创建或审批 run，不调 Provider，不做鉴权、网页、Docker、部署或公开发布 |
+| 完成门 | 已满足：真实 HTTP 启动、health、只读复用、缺失库失败关闭、双库哈希不变、53 项回归通过 |
+| 风险 | 默认只监听 `127.0.0.1`；当前没有身份权限边界，不应直接暴露到不可信网络 |
+| 项目基线 | `main@c1beba48`：PR #10 已 squash 合并；main CI run `30737546034` 成功 |
+| 阻碍 | 无工程阻碍；health 本地分支尚未获得新的 push/PR 授权，也没有远端 CI 证据 |
 
 ## 复用审查
 
@@ -42,6 +42,21 @@
   [main CI run 30684609206](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30684609206)
   在该 SHA 上完成，结论为 `success`。
 
+## READONLY-API-HEALTH-015 验证证据
+
+- `auditable_nl2sql.server` 已把现有 `WorkflowRunReader` 绑定到 FastAPI lifespan；正常退出后再次
+  查询固定失败为 `workflow runner is closed`，没有遗留可用写/读连接。
+- README 中的模块命令在真实子进程以 Uvicorn 监听 `127.0.0.1`，health 返回
+  `health-v1 / 0.1.0.dev0 / ok / read_only=true`，同一进程可回查完整 `run-record-v5`。
+- 缺失业务库或 checkpoint 时在监听前失败且不创建文件；health 和 run 查询前后两份 SQLite
+  SHA-256 均不变，应用没有注册 `POST/PUT/PATCH/DELETE` 路由。
+- Uvicorn `0.52.1` 与 Windows 条件依赖 Colorama `0.4.6` 已精确固定到 pyproject、直接依赖输入
+  和 hash lock；同一 Windows Python 3.13 环境 `pip check` 通过。
+- Python `3.13.12` 启动器定向 3 项、全量 53 项测试通过；`compileall`、CLI help、
+  `git diff --check`、`.local` 跟踪、可变路由和产品反向导入检查通过。
+- 本轮 Provider 调用、凭据读取、token 消耗、费用、push 与 PR 均为 `0`。完整合同见
+  [`docs/work/readonly-api-health.md`](work/readonly-api-health.md)。
+
 ## FASTAPI-READONLY-QUERY-014 验证证据
 
 - `GET /api/v1/runs` 返回 `run-list-v1` 的稳定任务摘要和有界分页；
@@ -56,6 +71,10 @@
   测试通过；`compileall`、`pip check`、`git diff --check`、`.local` 跟踪和产品依赖方向检查通过。
 - 本轮 Provider 调用、凭据读取和 token 消耗均为 `0`。完整合同见
   [`docs/work/fastapi-readonly-query.md`](work/fastapi-readonly-query.md)。
+- [PR #10](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/10) 的 head
+  `974daf60a77f0e32b84488e769cdbe193a9a5200` 上 API job 成功，随后 squash 合并为
+  `c1beba48e367facf3586fea84928192d0fb7afdd`；[main CI run 30737546034](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30737546034)
+  在该 merge commit 上完成，结论为 `success`。
 
 ## RESULT-EVIDENCE-006 验证证据
 
@@ -226,9 +245,9 @@
 
 ## 当前检查点
 
-FastAPI 只读查询核心已在本地完成；保留首次真实 20 条基线的 `7/8`、`14/20`、`7/20`，不做
-prompt 调优或补跑。下一候选是可独立启动的只读 API 装配与 health 最小切片；尚未开工，需先
-完成新的开工三问与风险判断。
+只读 API 查询核心已由 PR #10 合入 `main`，独立启动与 health 切片已在本地分支完成；保留首次
+真实 20 条基线的 `7/8`、`14/20`、`7/20`，不做 prompt 调优或补跑。下一步仅在获得新的
+push/PR 授权后发布 health 分支并取得远端 CI；鉴权、网页、Docker 与部署不自动开工。
 
 ## 审批中断/恢复最小风险探针
 

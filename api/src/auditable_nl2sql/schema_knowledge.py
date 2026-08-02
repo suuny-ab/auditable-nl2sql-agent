@@ -8,7 +8,10 @@ from dataclasses import dataclass
 from typing import Any
 
 
-SCHEMA_KNOWLEDGE_SCHEMA_VERSION = "schema-derived-knowledge-v1"
+SCHEMA_KNOWLEDGE_SCHEMA_VERSION = "schema-derived-knowledge-v2"
+DESCRIPTION_SOURCE_NATIVE = "native"
+DESCRIPTION_SOURCE_GENERATED = "generated"
+DESCRIPTION_SOURCE_EMPTY = "empty"
 
 
 class SchemaKnowledgeError(ValueError):
@@ -27,8 +30,10 @@ class SchemaCandidateTerm:
 class SchemaFieldDescription:
     table: str
     table_description: str
+    table_description_source: str
     field: str
     description: str
+    description_source: str
 
     @property
     def reference(self) -> str:
@@ -51,6 +56,8 @@ class _SchemaField:
     declared_type: str
     primary_key_position: int
     foreign_key: tuple[str, str] | None
+    native_table_description: str | None
+    native_description: str | None
 
     @property
     def reference(self) -> str:
@@ -78,6 +85,36 @@ def _require_non_negative_integer(value: object, label: str) -> int:
     if type(value) is not int or value < 0:
         raise SchemaKnowledgeError(f"{label} must be a non-negative integer")
     return value
+
+
+def _optional_description(value: object, label: str) -> str | None:
+    if value is None:
+        return None
+    normalized = _require_text(value, label)
+    if len(normalized) > 2_000:
+        raise SchemaKnowledgeError(f"{label} is too long")
+    return normalized
+
+
+def merge_description_layers(
+    native_description: str | None,
+    generated_description: str | None,
+) -> tuple[str | None, str]:
+    """Resolve one description as native, generated, or explicitly empty."""
+
+    native_description = _optional_description(
+        native_description,
+        "native description",
+    )
+    generated_description = _optional_description(
+        generated_description,
+        "generated description",
+    )
+    if native_description is not None:
+        return native_description, DESCRIPTION_SOURCE_NATIVE
+    if generated_description is not None:
+        return generated_description, DESCRIPTION_SOURCE_GENERATED
+    return None, DESCRIPTION_SOURCE_EMPTY
 
 
 def _identifier_tokens(value: str) -> frozenset[str]:
@@ -110,7 +147,9 @@ def _materialize_fields(
         raise SchemaKnowledgeError("schema snapshot must contain tables")
 
     table_names: set[str] = set()
-    raw_tables: list[tuple[str, frozenset[str], Mapping[str, Any]]] = []
+    raw_tables: list[
+        tuple[str, frozenset[str], str | None, Mapping[str, Any]]
+    ] = []
     for table_index, raw_table in enumerate(schema_snapshot):
         if not isinstance(raw_table, Mapping):
             raise SchemaKnowledgeError(f"table[{table_index}] must be an object")
@@ -118,12 +157,18 @@ def _materialize_fields(
         if table_name in table_names:
             raise SchemaKnowledgeError(f"duplicate schema table: {table_name}")
         table_names.add(table_name)
-        raw_tables.append((table_name, _table_roles(table_name), raw_table))
+        table_description = _optional_description(
+            raw_table.get("description"),
+            f"table[{table_index}].description",
+        )
+        raw_tables.append(
+            (table_name, _table_roles(table_name), table_description, raw_table)
+        )
 
     fields: list[_SchemaField] = []
     field_references: set[str] = set()
     foreign_keys_by_reference: dict[str, tuple[str, str]] = {}
-    for table_name, _roles, raw_table in raw_tables:
+    for table_name, _roles, _table_description_value, raw_table in raw_tables:
         raw_foreign_keys = raw_table.get("foreign_keys", [])
         if not isinstance(raw_foreign_keys, list):
             raise SchemaKnowledgeError(f"{table_name}.foreign_keys must be a list")
@@ -152,7 +197,7 @@ def _materialize_fields(
                 referenced_column,
             )
 
-    for table_name, roles, raw_table in raw_tables:
+    for table_name, roles, table_description, raw_table in raw_tables:
         raw_columns = raw_table.get("columns")
         if not isinstance(raw_columns, list) or not raw_columns:
             raise SchemaKnowledgeError(f"{table_name}.columns must be non-empty")
@@ -178,6 +223,10 @@ def _materialize_fields(
                 raw_column.get("primary_key_position", 0),
                 f"{reference}.primary_key_position",
             )
+            column_description = _optional_description(
+                raw_column.get("description"),
+                f"{reference}.description",
+            )
             fields.append(
                 _SchemaField(
                     table=table_name,
@@ -187,6 +236,8 @@ def _materialize_fields(
                     declared_type=declared_type.strip().upper(),
                     primary_key_position=primary_key_position,
                     foreign_key=foreign_keys_by_reference.get(reference),
+                    native_table_description=table_description,
+                    native_description=column_description,
                 )
             )
 
@@ -489,17 +540,30 @@ def build_schema_knowledge(
         field.reference: _field_roles(field, table_roles_by_name)
         for field in fields
     }
-    descriptions = tuple(
-        SchemaFieldDescription(
-            table=field.table,
-            table_description=_table_description(field.table, field.table_roles),
-            field=field.name,
-            description=_field_description(field, roles_by_reference[field.reference]),
+    descriptions: list[SchemaFieldDescription] = []
+    for field in fields:
+        table_description, table_source = merge_description_layers(
+            field.native_table_description,
+            _table_description(field.table, field.table_roles),
         )
-        for field in fields
-    )
+        description, description_source = merge_description_layers(
+            field.native_description,
+            _field_description(field, roles_by_reference[field.reference]),
+        )
+        if table_description is None or description is None:
+            raise SchemaKnowledgeError("generated schema descriptions must not be empty")
+        descriptions.append(
+            SchemaFieldDescription(
+                table=field.table,
+                table_description=table_description,
+                table_description_source=table_source,
+                field=field.name,
+                description=description,
+                description_source=description_source,
+            )
+        )
     return SchemaDerivedKnowledge(
         schema_version=SCHEMA_KNOWLEDGE_SCHEMA_VERSION,
         candidate_terms=_candidate_terms(fields, roles_by_reference),
-        field_descriptions=descriptions,
+        field_descriptions=tuple(descriptions),
     )

@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .native_metadata import extract_sqlite_ddl_comments
+
 
 class ReadOnlyViolation(ValueError):
     """Raised when SQL attempts an operation outside the read-only contract."""
@@ -29,6 +31,7 @@ class ColumnSchema:
     nullable: bool
     primary_key_position: int
     default_value: str | None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,7 @@ class TableSchema:
     name: str
     columns: tuple[ColumnSchema, ...]
     foreign_keys: tuple[ForeignKeySchema, ...]
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -121,11 +125,11 @@ def read_schema(database_path: str | Path) -> tuple[TableSchema, ...]:
     """Return user table, column, primary-key, and foreign-key metadata."""
 
     with closing(_connect_read_only(Path(database_path))) as connection:
-        table_names = tuple(
-            row[0]
+        table_definitions = tuple(
+            (str(row[0]), None if row[1] is None else str(row[1]))
             for row in connection.execute(
                 """
-                SELECT name
+                SELECT name, sql
                 FROM sqlite_schema
                 WHERE type = 'table' AND name NOT GLOB 'sqlite_*'
                 ORDER BY name
@@ -134,7 +138,7 @@ def read_schema(database_path: str | Path) -> tuple[TableSchema, ...]:
         )
 
         tables: list[TableSchema] = []
-        for table_name in table_names:
+        for table_name, create_sql in table_definitions:
             column_rows = connection.execute(
                 """
                 SELECT name, type, \"notnull\", dflt_value, pk
@@ -143,6 +147,11 @@ def read_schema(database_path: str | Path) -> tuple[TableSchema, ...]:
                 """,
                 (table_name,),
             ).fetchall()
+            native_metadata = extract_sqlite_ddl_comments(
+                create_sql,
+                table_name=table_name,
+                column_names=tuple(str(row[0]) for row in column_rows),
+            )
             columns = tuple(
                 ColumnSchema(
                     name=str(row[0]),
@@ -150,6 +159,7 @@ def read_schema(database_path: str | Path) -> tuple[TableSchema, ...]:
                     nullable=not bool(row[2]) and not bool(row[4]),
                     default_value=None if row[3] is None else str(row[3]),
                     primary_key_position=int(row[4]),
+                    description=native_metadata.column_descriptions.get(str(row[0])),
                 )
                 for row in column_rows
             )
@@ -175,6 +185,7 @@ def read_schema(database_path: str | Path) -> tuple[TableSchema, ...]:
                     name=table_name,
                     columns=columns,
                     foreign_keys=foreign_keys,
+                    description=native_metadata.table_description,
                 )
             )
         return tuple(tables)

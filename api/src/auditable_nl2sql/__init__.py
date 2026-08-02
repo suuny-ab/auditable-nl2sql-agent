@@ -79,6 +79,7 @@ from .schema_knowledge import (
     SchemaFieldDescription,
     SchemaKnowledgeError,
     build_schema_knowledge,
+    merge_description_layers,
 )
 from .schema_summary import (
     SCHEMA_SUMMARY_SCHEMA_VERSION,
@@ -168,6 +169,7 @@ __all__ = [
     "SchemaFieldDescription",
     "SchemaKnowledgeError",
     "build_schema_knowledge",
+    "merge_description_layers",
     "SCHEMA_SUMMARY_SCHEMA_VERSION",
     "SchemaSummaryError",
     "build_schema_summary",

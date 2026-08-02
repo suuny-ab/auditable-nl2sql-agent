@@ -196,19 +196,11 @@ def _failure(
 
 
 def _schema_snapshot(database_path: Path) -> list[dict[str, Any]]:
-    return [
-        {
+    snapshot: list[dict[str, Any]] = []
+    for table in read_schema(database_path):
+        table_payload: dict[str, Any] = {
             "name": table.name,
-            "columns": [
-                {
-                    "name": column.name,
-                    "declared_type": column.declared_type,
-                    "nullable": column.nullable,
-                    "primary_key_position": column.primary_key_position,
-                    "default_value": column.default_value,
-                }
-                for column in table.columns
-            ],
+            "columns": [],
             "foreign_keys": [
                 {
                     "column": foreign_key.column,
@@ -218,8 +210,21 @@ def _schema_snapshot(database_path: Path) -> list[dict[str, Any]]:
                 for foreign_key in table.foreign_keys
             ],
         }
-        for table in read_schema(database_path)
-    ]
+        if table.description is not None:
+            table_payload["description"] = table.description
+        for column in table.columns:
+            column_payload = {
+                "name": column.name,
+                "declared_type": column.declared_type,
+                "nullable": column.nullable,
+                "primary_key_position": column.primary_key_position,
+                "default_value": column.default_value,
+            }
+            if column.description is not None:
+                column_payload["description"] = column.description
+            table_payload["columns"].append(column_payload)
+        snapshot.append(table_payload)
+    return snapshot
 
 
 def _json_scalar(value: Any) -> str | int | float | bool | None:

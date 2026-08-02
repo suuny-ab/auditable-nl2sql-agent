@@ -20,6 +20,11 @@ PROJECT = """# 项目事实
 网页和服务器部署仍待实现。
 """
 
+PROJECT_WITH_WEB = PROJECT.replace(
+    "网页和服务器部署仍待实现。",
+    "本地静态展示页已可运行，页面尚未部署。",
+)
+
 STATUS = """# 当前开发状态
 
 | `state` | `in-progress` |
@@ -88,6 +93,19 @@ class DocGardenerTests(unittest.TestCase):
 
         self.assertEqual(report.stale_count, 0)
         self.assertEqual(report.review_count, 0)
+
+    def test_available_web_canonical_rejects_current_unavailable_claim(self) -> None:
+        root = self.build_root(
+            {
+                "PROJECT.md": PROJECT_WITH_WEB,
+                "web/README.md": "当前网页仍待实现，没有可运行版本。\n",
+            }
+        )
+
+        report = scan(root)
+
+        self.assertEqual(report.stale_count, 1)
+        self.assertEqual(report.findings[0].rule_id, "current_web_availability_conflict")
 
     def test_manual_all_scope_lists_unanchored_historical_current_for_review(self) -> None:
         root = self.build_root(

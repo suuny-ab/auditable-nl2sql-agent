@@ -4,22 +4,22 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `ready-to-push` |
+| `state` | `in-progress` |
 | 更新时间 | `2026-08-02` |
-| 当前切片 | `DOC-GARDENER-021`：NL2SQL 文档防腐扫描、当前态矛盾门禁与首次报告 |
-| 最近完成 | `GOVERNANCE-RULES-SLIM-020`：PR #15 候选双 CI 绿后合并为 `4e9ec9de` |
-| 当前状态 | 园丁活动扫描 `9/stale=0`、全扫 `29/stale=0/review=7`；全量 65 项测试与治理门已绿 |
-| 完成门 | 本地范围 / 报告 / 门禁已通过；待精确 head `api` 与 `container` 双 CI 绿后 squash |
-| 项目基线 | `origin/main@4e9ec9de`；PR 候选双绿，main API 绿而 container 因 Docker Hub 超时红 |
-| 阻碍 | 无本地阻碍；不得把外部 registry 超时写成产品失败或 main CI 已绿 |
+| 当前切片 | `WEB-SHOWCASE-REPLAY-022`：本地静态展示页与真实只读 run 回放 |
+| 最近完成 | `DOC-GARDENER-021`：PR #16 合并为 `ecfbea24`，main 双 CI 通过 |
+| 当前状态 | 本地页面完成；Web 构建 / SSR 2 项、Python 3.13 全量 69 项测试及治理 / Compose 门均通过 |
+| 完成门 | 精确 head 的 `web` / `api` / `container` CI 全绿后 squash；本片不部署 |
+| 项目基线 | `origin/main@ecfbea24`；main CI run `30744938052` 成功 |
+| 阻碍 | 无；页面内容必须保持合成数据、只读回放和非生产级边界 |
 
 ## 当前队列
 
-- 进行中：用本单授权推送当前最终候选并创建 Draft PR，不追加园丁、产品或定时任务范围。
-- 后续：本单合并后才重新评估最小网页；本片不自动开工网页。
+- 待远端门：单页展示、一个真实回放、证据入口及 Web CI 已完成；不增加交互问答或部署。
+- 后续：部署页面须用户另行当次批准；本片只交付本地启动证据。
 - 保留：首次真实 20 条基线 `7/8`、`14/20`、`7/20`，不做 prompt 调优或补跑。
 
 ## 下一检查点
 
-- 推送前复核园丁门、65 项测试、append-only 日志与禁改范围。
-- 推送后核对远端精确 head，等待 `api` / `container` 双 CI，再按本单授权 squash。
+- 只推送当前精确候选并创建 Draft PR；`web` / `api` / `container` CI 任一不绿则不合并。
+- 合并后复核 main CI、写两层最终回执并归档派发单；页面部署继续保持红灯。

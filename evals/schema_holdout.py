@@ -116,33 +116,33 @@ _MAIN_TABLE_PATTERN = re.compile(
 _SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE buyer_directory (
-    buyer_key TEXT PRIMARY KEY,
-    buyer_label TEXT NOT NULL,
-    market_area TEXT NOT NULL,
-    buyer_class TEXT NOT NULL
+CREATE TABLE buyer_directory /* 合成客户主数据；buyer 表示客户。 */ (
+    buyer_key /* 客户唯一标识。 */ TEXT PRIMARY KEY,
+    buyer_label /* 客户展示名称。 */ TEXT NOT NULL,
+    market_area /* 客户所属地区，对应区域。 */ TEXT NOT NULL,
+    buyer_class /* 客户业务分群。 */ TEXT NOT NULL
 );
 
-CREATE TABLE merchandise (
-    sku TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    department TEXT NOT NULL,
-    catalog_price_cents INTEGER NOT NULL CHECK (catalog_price_cents >= 0)
+CREATE TABLE merchandise /* 合成商品主数据。 */ (
+    sku /* 商品唯一标识。 */ TEXT PRIMARY KEY,
+    title /* 商品展示名称。 */ TEXT NOT NULL,
+    department /* 商品所属品类。 */ TEXT NOT NULL,
+    catalog_price_cents /* 商品目录标价，以整数分保存。 */ INTEGER NOT NULL CHECK (catalog_price_cents >= 0)
 );
 
-CREATE TABLE transaction_lines (
-    ticket_no TEXT NOT NULL,
-    buyer_key TEXT NOT NULL REFERENCES buyer_directory(buyer_key),
-    sku TEXT NOT NULL REFERENCES merchandise(sku),
-    occurred_on TEXT NOT NULL,
-    state_code TEXT NOT NULL CHECK (
+CREATE TABLE transaction_lines /* 合成订单商品明细事实表。 */ (
+    ticket_no /* 订单唯一标识；同一订单可有多条商品明细。 */ TEXT NOT NULL,
+    buyer_key /* 客户标识，关联客户主数据。 */ TEXT NOT NULL REFERENCES buyer_directory(buyer_key),
+    sku /* 商品标识，关联商品主数据。 */ TEXT NOT NULL REFERENCES merchandise(sku),
+    occurred_on /* 订单日期，格式为 YYYY-MM-DD。 */ TEXT NOT NULL,
+    state_code /* 订单状态：SETTLED=paid，IN_TRANSIT=shipped，CLOSED=completed，VOID=cancelled。 */ TEXT NOT NULL CHECK (
         state_code IN ('SETTLED', 'IN_TRANSIT', 'CLOSED', 'VOID')
     ),
-    source_code TEXT NOT NULL CHECK (
+    source_code /* 销售渠道：WEB=online，SHOP=store，PLATFORM=marketplace。 */ TEXT NOT NULL CHECK (
         source_code IN ('WEB', 'SHOP', 'PLATFORM')
     ),
-    units INTEGER NOT NULL CHECK (units > 0),
-    paid_unit_cents INTEGER NOT NULL CHECK (paid_unit_cents >= 0),
+    units /* 订单行购买数量。 */ INTEGER NOT NULL CHECK (units > 0),
+    paid_unit_cents /* 实际成交单价，以整数分保存；计算销售额后除以 100 换算元。 */ INTEGER NOT NULL CHECK (paid_unit_cents >= 0),
     PRIMARY KEY (ticket_no, sku)
 );
 """

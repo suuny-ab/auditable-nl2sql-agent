@@ -36,7 +36,8 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
 
 - 公开源码仓库为 <https://github.com/suuny-ab/auditable-nl2sql-agent>；公开不代表 MVP 已完成。
 - 可重复创建 4 表、共 26 行记录的合成电商 SQLite 数据库，且拒绝覆盖已有数据库文件。
-- schema 读取返回用户表、字段、主键和外键，不暴露 SQLite 内部表。
+- schema 读取返回用户表、字段、主键、外键，以及表名 / 字段名紧邻的 SQLite DDL 原生注释（若有），
+  不暴露 SQLite 内部表、不把字符串或约束内文本误认作注释。
 - SQL 执行同时受 URI `mode=ro`、`query_only` 和 SQLite authorizer 约束，并限制返回行数和
   本地执行时间；写入、DDL、`ATTACH` 和 `PRAGMA` 失败关闭。
 - 首切片 8 个测试已在本地和首次 GitHub Actions 中通过；这只证明 SQLite 事实层，不是完整
@@ -70,10 +71,10 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
   `0.72` 为门、最多召回 2 条相似只读模板；它不含真实企业知识、向量库、运行时数据库值扫描、
   记忆或技能，知识上下文也不替代 schema 校验或机械安全边界。
 - 第二合成库有独立套装：13 条候选术语与 16 条字段备注逐项来自
-  `schema-derived-knowledge-v1` 规则构建器，枚举和训练对为空。生成器必须显式绑定 namespace，输入
+  `schema-derived-knowledge-v2` 规则构建器，备注按 SQLite DDL 原生注释、确定性生成、空值的顺序合并，枚举和训练对为空。生成器必须显式绑定 namespace，输入
   schema 不是该 namespace 的字段子集时在 Provider transport 前失败关闭，不回退或加载另一库。
-  规则构建器只读取表 / 字段标识符、声明类型、主键和外键，不调用 LLM、扫描业务行或推断闭集枚举
-  的存储值，也不替代 schema 校验或机械安全边界。
+  规则构建器只读取 schema 元数据中的表 / 字段标识符、声明类型、主键、外键和上述原生注释，
+  不调用 LLM、扫描业务行或推断闭集枚举的存储值，也不替代 schema 校验或机械安全边界。
 - Provider 请求同时保留完整 schema，并增加 `schema-summary-v1` 紧凑投影：按稳定顺序列出表、字段、
   声明类型、主键位置和外键，主库为 `4 表/17 字段`，第二合成库为 `3 表/16 字段`。摘要不读取业务
   行、不提供实际枚举值，畸形、悬空或超限结构在 transport 前失败关闭；完整 schema 仍是权威。

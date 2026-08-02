@@ -6,23 +6,23 @@
 | --- | --- |
 | `state` | `in-progress` |
 | 更新时间 | `2026-08-03` |
-| 当前切片 | `DATASOURCE-GOVERNANCE-039`：治理环境按数据源隔离 |
-| 最近完成 | `METRICS-CARD-038`：PR #32 squash 为 `bbe0749`，main 三个 CI job 全绿 |
-| 当前状态 | 两套 namespace、按源装载与跨源失败关闭已完成；本地全门绿，待远端评审 |
-| 完成门 | 两套资源物理隔离、交叉绑定失败关闭、双库上下文指纹不变、全门绿后合并，不部署 |
-| 项目基线 | `origin/main@bbe07495bc5bcf5c2a7949b027df84053fb6c66d`；main CI run `30763359201` 成功 |
-| 阻碍 | 无；本片不调用 Provider、不运行冻结评测、不修改题目或部署 |
+| 当前切片 | `NATIVE-METADATA-040`：SQLite 原生注释爬取与分层合并 |
+| 最近完成 | `DATASOURCE-GOVERNANCE-039`：PR #33 squash 为 `d122a05`，main 三个 CI job 全绿 |
+| 当前状态 | 本地候选全门绿：Python 全量 `131` 项本地测试通过，注释爬取、三层合并与第二库 native 资源完成；真实 Provider 调用仍为 `0` |
+| 完成门 | 注释只读爬取、native > generated 回退、双库离线回归与全门绿、唯一 15 题复测后合并 |
+| 项目基线 | `origin/main@d122a0571bccbf7ca3901122a6bb9778b47b5ef7`；main CI run `30764979437` 成功 |
+| 阻碍 | 无；待冻结候选后消费唯一 15 题 Provider 复测，自动重试 0，不补跑、不部署 |
 
 ## 当前队列
 
-- 主库现有术语 / 字段备注 / 枚举 / 16 条训练对迁入默认 namespace，不改资源内容。
-- 第二库把 deterministic schema builder 的 13 个候选术语 / 16 条字段备注归入独立 namespace；
-  枚举与训练对保持空集，不从业务行推断值。
-- 生成器显式绑定 datasource；schema 不是该 namespace 的字段子集时在 transport 前失败关闭。
-- 迁移前主 40 / 第二库 15 上下文 SHA-256 已冻结；本片只做离线等价回归，不运行真实评测。
-- Python 全量 `125` 项测试（`3.13.12`，`125/125`）已通过；Provider 调用、评测与部署均为 `0`。
+- SQLite 没有独立 comment 元数据列；本片只读取 `sqlite_schema.sql` 中与表 / 字段直接相邻的 DDL
+  注释，不扫描业务行，不声称支持其他数据库方言。
+- 第二库自动知识已在现有 datasource namespace 内重建；16 个字段均采用原生注释，合并器保留
+  generated 与 empty 回退合同。
+- 主库 40 题与第二库 15 题 / gold 不改；候选冻结前 Provider 调用为 `0`。
+- 唯一复测与最新 `8/15` 对比，升降均封存；最多 15 次、重试 0，不补跑、不据结果调候选。
 
 ## 下一检查点
 
-- 用夜班授权推送精确候选并创建 Draft PR；api / web / container 全绿后 squash 合并并复核 main。
-- 合并后归档本单；不运行真实评测、不调用 Provider、不部署。
+- 提交本地候选并记录精确冻结 SHA。
+- 只执行唯一 15 题复测；如实落盘后进入夜班预授权远端流程，不部署。

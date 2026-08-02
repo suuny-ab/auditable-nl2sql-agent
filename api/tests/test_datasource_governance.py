@@ -35,25 +35,17 @@ RESOURCE_NAMES = (
 MAIN_CONTEXTS_V3_SHA256 = (
     "29980F9AA5EC0B7AB2E727BC60E7CCAB7FA16EBA107E4D48052C58B57457ABEE"
 )
-HOLDOUT_CONTEXTS_V3_SHA256 = (
-    "1C146DABBA5BE8B20A4B4E9EE2E23FCBFAA12CAE56514CC8ACB0AA0617B65921"
+HOLDOUT_NATIVE_CONTEXTS_V3_SHA256 = (
+    "F62CDCC0006ED9C3EC94D20D97741D27AEF2082B22AD17429D9F2C7DB36A27C7"
 )
 
 
 def _schema_snapshot(database_path: Path) -> list[dict[str, object]]:
-    return [
-        {
+    snapshot: list[dict[str, object]] = []
+    for table in read_schema(database_path):
+        table_payload: dict[str, object] = {
             "name": table.name,
-            "columns": [
-                {
-                    "name": column.name,
-                    "declared_type": column.declared_type,
-                    "nullable": column.nullable,
-                    "primary_key_position": column.primary_key_position,
-                    "default_value": column.default_value,
-                }
-                for column in table.columns
-            ],
+            "columns": [],
             "foreign_keys": [
                 {
                     "column": key.column,
@@ -63,8 +55,21 @@ def _schema_snapshot(database_path: Path) -> list[dict[str, object]]:
                 for key in table.foreign_keys
             ],
         }
-        for table in read_schema(database_path)
-    ]
+        if table.description is not None:
+            table_payload["description"] = table.description
+        for column in table.columns:
+            column_payload: dict[str, object] = {
+                "name": column.name,
+                "declared_type": column.declared_type,
+                "nullable": column.nullable,
+                "primary_key_position": column.primary_key_position,
+                "default_value": column.default_value,
+            }
+            if column.description is not None:
+                column_payload["description"] = column.description
+            table_payload["columns"].append(column_payload)
+        snapshot.append(table_payload)
+    return snapshot
 
 
 def _legacy_context_digest(contexts: list[dict[str, object]]) -> str:
@@ -114,7 +119,7 @@ class DatasourceGovernanceTests(unittest.TestCase):
         for resource_name in RESOURCE_NAMES[1:]:
             self.assertFalse(data_root.joinpath(resource_name).is_file())
 
-    def test_default_and_holdout_contexts_are_migration_equivalent(self) -> None:
+    def test_default_and_native_holdout_contexts_are_digest_locked(self) -> None:
         cases = load_cases(PROJECT_ROOT / "evals/cases.jsonl")
         holdout_cases = load_cases(
             PROJECT_ROOT / "evals/schema_holdout_cases.jsonl"
@@ -158,7 +163,7 @@ class DatasourceGovernanceTests(unittest.TestCase):
         )
         self.assertEqual(
             _legacy_context_digest(holdout_contexts),
-            HOLDOUT_CONTEXTS_V3_SHA256,
+            HOLDOUT_NATIVE_CONTEXTS_V3_SHA256,
         )
 
     def test_holdout_namespace_equals_deterministic_builder_artifacts(self) -> None:

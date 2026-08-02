@@ -350,8 +350,8 @@ def load_business_knowledge() -> BusinessKnowledge:
     }:
         raise BusinessKnowledgeError("Training pair similarity contract changed")
     raw_pairs = training_payload["pairs"]
-    if not isinstance(raw_pairs, list) or len(raw_pairs) != 8:
-        raise BusinessKnowledgeError("Training pairs must contain exactly 8 entries")
+    if not isinstance(raw_pairs, list) or len(raw_pairs) != 12:
+        raise BusinessKnowledgeError("Training pairs must contain exactly 12 entries")
 
     training_pairs: list[TrainingPair] = []
     source_case_ids: set[str] = set()
@@ -392,8 +392,8 @@ def load_business_knowledge() -> BusinessKnowledge:
                 enabled=enabled,
             )
         )
-    if source_case_ids != {f"success-{index:03d}" for index in range(1, 9)}:
-        raise BusinessKnowledgeError("Training pairs must cover success-001 through 008")
+    if source_case_ids != {f"success-{index:03d}" for index in range(1, 13)}:
+        raise BusinessKnowledgeError("Training pairs must cover success-001 through 012")
     return BusinessKnowledge(
         terms=tuple(terms),
         field_descriptions=tuple(descriptions),

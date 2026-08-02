@@ -88,13 +88,13 @@ class BusinessKnowledgeTests(unittest.TestCase):
             self.assertTrue(term.definition)
             self.assertTrue(set(term.related_fields) <= described_fields)
 
-    def test_training_pairs_cover_only_the_original_frozen_success_cases(self) -> None:
+    def test_training_pairs_cover_original_and_observed_success_cases(self) -> None:
         cases = load_cases(PROJECT_ROOT / "evals/cases.jsonl")
         validate_case_contract(cases)
         expected = [
             (case["case_id"], case["question"], case["reference_sql"])
             for case in cases
-            if case["case_id"] in {f"success-{index:03d}" for index in range(1, 9)}
+            if case["case_id"] in {f"success-{index:03d}" for index in range(1, 13)}
         ]
         training_pairs = load_business_knowledge().training_pairs
         actual = [
@@ -104,10 +104,9 @@ class BusinessKnowledgeTests(unittest.TestCase):
 
         self.assertEqual(actual, expected)
         self.assertTrue(all(pair.enabled for pair in training_pairs))
-        self.assertTrue(
-            {f"success-{index:03d}" for index in range(9, 13)}.isdisjoint(
-                {pair.source_case_id for pair in training_pairs}
-            )
+        self.assertEqual(
+            {pair.source_case_id for pair in training_pairs},
+            {f"success-{index:03d}" for index in range(1, 13)},
         )
 
     def test_enum_values_cover_only_closed_fields_and_match_the_fixture(self) -> None:
@@ -206,6 +205,36 @@ class BusinessKnowledgeTests(unittest.TestCase):
             TRAINING_PAIR_SIMILARITY_THRESHOLD,
         )
         self.assertLess(examples[0]["similarity"], 1.0)
+
+    def _assert_observed_case_recall(
+        self,
+        case_id: str,
+        expected_alias: str,
+    ) -> None:
+        cases = load_cases(PROJECT_ROOT / "evals/cases.jsonl")
+        case = next(item for item in cases if item["case_id"] == case_id)
+
+        examples = retrieve_training_examples(case["question"])
+
+        self.assertLessEqual(len(examples), TRAINING_PAIR_MAX_MATCHES)
+        self.assertEqual(examples[0]["source_case_id"], case_id)
+        self.assertEqual(examples[0]["question"], case["question"])
+        self.assertEqual(examples[0]["sql"], case["reference_sql"])
+        self.assertEqual(examples[0]["similarity"], 1.0)
+        self.assertIn("LIMIT 5", examples[0]["sql"])
+        self.assertIn(expected_alias, examples[0]["sql"])
+
+    def test_success_009_recalls_bounded_order_month_reference(self) -> None:
+        self._assert_observed_case_recall("success-009", "AS order_month")
+
+    def test_success_010_recalls_bounded_region_reference(self) -> None:
+        self._assert_observed_case_recall("success-010", "AS order_count")
+
+    def test_success_011_recalls_bounded_units_sold_reference(self) -> None:
+        self._assert_observed_case_recall("success-011", "AS units_sold")
+
+    def test_success_012_recalls_bounded_customer_reference(self) -> None:
+        self._assert_observed_case_recall("success-012", "AS order_count")
 
     def test_unrelated_question_does_not_recall_training_pair(self) -> None:
         self.assertEqual(retrieve_training_examples("明天会下雨吗？"), [])

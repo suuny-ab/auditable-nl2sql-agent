@@ -35,6 +35,7 @@ _SEMANTIC_ERROR_BY_ACTION = {
 }
 _EVALUATION_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}\Z")
 CaseValidator = Callable[[Iterable[Mapping[str, Any]]], None]
+CaseLoader = Callable[[str | Path], list[dict[str, Any]]]
 
 
 class EvaluationRunnerError(RuntimeError):
@@ -154,6 +155,7 @@ def run_model_evaluation(
     generator: Any,
     evaluation_id: str,
     case_validator: CaseValidator = validate_case_contract,
+    case_loader: CaseLoader = load_cases,
 ) -> dict[str, Any]:
     """Run every frozen case exactly once through one persistent WorkflowRunner."""
 
@@ -173,7 +175,7 @@ def run_model_evaluation(
     if checkpoint.exists():
         raise EvaluationRunnerError("checkpoint database already exists")
 
-    cases = load_cases(dataset)
+    cases = case_loader(dataset)
     case_validator(cases)
     database_hash_before = _sha256(business)
     case_reports: list[dict[str, Any]] = []
@@ -211,25 +213,33 @@ def run_model_evaluation(
             if usage is not None and not isinstance(usage, Mapping):
                 raise EvaluationRunnerError(f"{case_id}: Provider usage is malformed")
 
-            case_reports.append(
-                {
-                    "case_id": case_id,
-                    "category": case["category"],
-                    "question": case["question"],
-                    "initial_status": initial_record["status"],
-                    "initial_approval": initial_record.get("approval"),
-                    "human_intervention": human_intervention,
-                    "simulated_decision": simulated_decision,
-                    "provider_usage": None if usage is None else dict(usage),
-                    "database_sha256_after_case": database_hash_after_case,
-                    "adjudication": _adjudicate_case(
-                        case,
-                        initial_record=initial_record,
-                        final_record=final_record,
-                    ),
-                    "run_record": final_record,
-                }
-            )
+            case_report = {
+                "case_id": case_id,
+                "category": case["category"],
+                "question": case["question"],
+                "initial_status": initial_record["status"],
+                "initial_approval": initial_record.get("approval"),
+                "human_intervention": human_intervention,
+                "simulated_decision": simulated_decision,
+                "provider_usage": None if usage is None else dict(usage),
+                "database_sha256_after_case": database_hash_after_case,
+                "adjudication": _adjudicate_case(
+                    case,
+                    initial_record=initial_record,
+                    final_record=final_record,
+                ),
+                "run_record": final_record,
+            }
+            for key in (
+                "source_case_id",
+                "source_answer_correct",
+                "variant_index",
+                "rewrite_style",
+                "meaning_preserved",
+            ):
+                if key in case:
+                    case_report[key] = case[key]
+            case_reports.append(case_report)
 
     database_hash_after = _sha256(business)
     if database_hash_after != database_hash_before:
@@ -331,7 +341,7 @@ def main() -> None:
     parser.add_argument("--dataset", type=Path, default=Path("evals/cases.jsonl"))
     parser.add_argument(
         "--dataset-contract",
-        choices=("frozen40", "schema-holdout-v1"),
+        choices=("frozen40", "schema-holdout-v1", "paraphrase-v1"),
         default="frozen40",
     )
     parser.add_argument("--business-database", required=True, type=Path)
@@ -349,10 +359,19 @@ def main() -> None:
         model=arguments.model,
     )
     case_validator = validate_case_contract
+    case_loader = load_cases
     if arguments.dataset_contract == "schema-holdout-v1":
         from evals.schema_holdout import validate_schema_holdout_contract
 
         case_validator = validate_schema_holdout_contract
+    elif arguments.dataset_contract == "paraphrase-v1":
+        from evals.paraphrase import (
+            load_paraphrase_cases,
+            validate_paraphrase_case_contract,
+        )
+
+        case_validator = validate_paraphrase_case_contract
+        case_loader = load_paraphrase_cases
     report = run_model_evaluation(
         arguments.dataset,
         business_database=arguments.business_database,
@@ -360,6 +379,7 @@ def main() -> None:
         generator=generator,
         evaluation_id=arguments.evaluation_id,
         case_validator=case_validator,
+        case_loader=case_loader,
     )
     written = write_evaluation_report(report, arguments.output)
     print(f"report={written}")

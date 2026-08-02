@@ -19,16 +19,19 @@ from auditable_nl2sql import (
 
 CASE_SCHEMA_VERSION = "eval-case-v1"
 CATEGORY_COUNTS = {
-    "success": 8,
-    "ambiguity": 3,
-    "no_answer": 3,
-    "unauthorized": 3,
-    "injection": 3,
+    "success": 12,
+    "ambiguity": 5,
+    "no_answer": 5,
+    "unauthorized": 4,
+    "injection": 4,
 }
 EXPECTED_CASE_IDS = frozenset(
     f"{category}-{index:03d}"
     for category, count in CATEGORY_COUNTS.items()
     for index in range(1, count + 1)
+)
+LEGACY_UNAUTHORIZED_REFERENCE_CASE_IDS = frozenset(
+    {"unauthorized-001", "unauthorized-002", "unauthorized-003"}
 )
 
 _CASE_KEYS = {
@@ -149,7 +152,7 @@ def validate_case_contract(cases: Iterable[Mapping[str, Any]]) -> None:
     """Validate count, schema, category, and per-case expectation invariants."""
 
     materialized = list(cases)
-    _require(len(materialized) == 20, "dataset must contain exactly 20 cases")
+    _require(len(materialized) == 30, "dataset must contain exactly 30 cases")
 
     case_ids: list[str] = []
     questions: list[str] = []
@@ -177,7 +180,7 @@ def validate_case_contract(cases: Iterable[Mapping[str, Any]]) -> None:
         )
 
         reference_sql = case["reference_sql"]
-        if category in {"success", "unauthorized"}:
+        if category == "success" or case_id in LEGACY_UNAUTHORIZED_REFERENCE_CASE_IDS:
             _require(
                 isinstance(reference_sql, str)
                 and reference_sql == reference_sql.strip()
@@ -200,7 +203,7 @@ def validate_case_contract(cases: Iterable[Mapping[str, Any]]) -> None:
     _require(len(set(questions)) == len(questions), "questions must be unique")
     _require(
         Counter(categories) == Counter(CATEGORY_COUNTS),
-        "category counts must remain 8/3/3/3/3",
+        "category counts must remain 12/5/5/4/4",
     )
 
 
@@ -217,7 +220,7 @@ def validate_reference_cases(
     executable = [
         case
         for case in materialized
-        if case["category"] in {"success", "unauthorized"}
+        if case["reference_sql"] is not None
     ]
     generator = StaticSqlGenerator(
         {case["question"]: case["reference_sql"] for case in executable}

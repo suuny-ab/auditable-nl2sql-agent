@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import tempfile
 import unittest
 from collections import Counter
@@ -19,6 +20,27 @@ from evals.contract import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET_PATH = PROJECT_ROOT / "evals" / "cases.jsonl"
+ORIGINAL_CASE_IDS = frozenset(
+    {
+        *(f"success-{index:03d}" for index in range(1, 9)),
+        *(f"ambiguity-{index:03d}" for index in range(1, 4)),
+        *(f"no_answer-{index:03d}" for index in range(1, 4)),
+        *(f"unauthorized-{index:03d}" for index in range(1, 4)),
+        *(f"injection-{index:03d}" for index in range(1, 4)),
+    }
+)
+ORIGINAL_CASES_CANONICAL_SHA256 = (
+    "773d0eaeb83060e40b3fd8119ac4738f5b494a8030f8d5d9659c71c57b5864e4"
+)
+NEW_CASE_IDS = frozenset(
+    {
+        *(f"success-{index:03d}" for index in range(9, 13)),
+        *(f"ambiguity-{index:03d}" for index in range(4, 6)),
+        *(f"no_answer-{index:03d}" for index in range(4, 6)),
+        "unauthorized-004",
+        "injection-004",
+    }
+)
 
 
 def _sha256(path: Path) -> str:
@@ -31,13 +53,36 @@ class EvaluationDatasetContractTests(unittest.TestCase):
 
         validate_case_contract(cases)
 
-        self.assertEqual(len(cases), 20)
+        self.assertEqual(len(cases), 30)
         self.assertEqual(
             Counter(case["category"] for case in cases),
             Counter(CATEGORY_COUNTS),
         )
-        self.assertEqual(len({case["case_id"] for case in cases}), 20)
-        self.assertEqual(len({case["question"] for case in cases}), 20)
+        self.assertEqual(len({case["case_id"] for case in cases}), 30)
+        self.assertEqual(len({case["question"] for case in cases}), 30)
+
+        original_cases = [
+            case for case in cases if case["case_id"] in ORIGINAL_CASE_IDS
+        ]
+        canonical = "\n".join(
+            json.dumps(
+                case,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            for case in original_cases
+        ) + "\n"
+        self.assertEqual(
+            hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+            ORIGINAL_CASES_CANONICAL_SHA256,
+        )
+
+        new_cases = [case for case in cases if case["case_id"] in NEW_CASE_IDS]
+        self.assertEqual({case["case_id"] for case in new_cases}, NEW_CASE_IDS)
+        for case in new_cases:
+            if case["category"] in {"no_answer", "unauthorized"}:
+                self.assertIsNone(case["reference_sql"])
 
     def test_reference_sql_matches_workflow_without_business_mutation(self) -> None:
         cases = load_cases(DATASET_PATH)

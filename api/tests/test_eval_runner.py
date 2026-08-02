@@ -46,6 +46,8 @@ class FrozenOutcomeGenerator:
             "injection": "block",
         }[category]
         sql = case["reference_sql"]
+        if action == "unsafe_operation" and sql is None:
+            sql = "DELETE FROM orders"
         if self._injected_failure and case["case_id"] == "injection-001":
             action = "query"
             sql = "SELECT 1 AS injected"
@@ -69,7 +71,7 @@ class FrozenOutcomeGenerator:
 
 
 class ModelEvaluationRunnerTests(unittest.TestCase):
-    def test_ideal_twenty_case_run_produces_exact_metrics_and_report(self) -> None:
+    def test_ideal_thirty_case_run_produces_exact_metrics_and_report(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             business = create_demo_database(root / "business.sqlite3")
@@ -83,29 +85,29 @@ class ModelEvaluationRunnerTests(unittest.TestCase):
                 evaluation_id="ideal",
             )
 
-            self.assertEqual(len(generator.calls), 20)
-            self.assertEqual(len(set(generator.calls)), 20)
+            self.assertEqual(len(generator.calls), 30)
+            self.assertEqual(len(set(generator.calls)), 30)
             self.assertEqual(report["schema_version"], "model-evaluation-report-v1")
-            self.assertEqual(len(report["cases"]), 20)
+            self.assertEqual(len(report["cases"]), 30)
             self.assertEqual(
                 report["metrics"]["execution_success_rate"],
-                {"numerator": 8, "denominator": 8, "value": 1.0},
+                {"numerator": 12, "denominator": 12, "value": 1.0},
             )
             self.assertEqual(
                 report["metrics"]["answer_correctness"],
-                {"numerator": 20, "denominator": 20, "value": 1.0},
+                {"numerator": 30, "denominator": 30, "value": 1.0},
             )
             self.assertEqual(
                 report["metrics"]["human_intervention_rate"],
-                {"numerator": 4, "denominator": 20, "value": 0.2},
+                {"numerator": 5, "denominator": 30, "value": 1 / 6},
             )
             self.assertEqual(
                 report["provider_usage"],
                 {
-                    "reported_case_count": 20,
-                    "prompt_tokens": 200,
-                    "completion_tokens": 40,
-                    "total_tokens": 240,
+                    "reported_case_count": 30,
+                    "prompt_tokens": 300,
+                    "completion_tokens": 60,
+                    "total_tokens": 360,
                 },
             )
             self.assertTrue(report["safety"]["business_database_unchanged"])
@@ -154,11 +156,11 @@ class ModelEvaluationRunnerTests(unittest.TestCase):
 
             self.assertEqual(
                 report["metrics"]["execution_success_rate"]["numerator"],
-                8,
+                12,
             )
             self.assertEqual(
                 report["metrics"]["answer_correctness"],
-                {"numerator": 19, "denominator": 20, "value": 0.95},
+                {"numerator": 29, "denominator": 30, "value": 29 / 30},
             )
             failed = next(
                 case for case in report["cases"] if case["case_id"] == "injection-001"

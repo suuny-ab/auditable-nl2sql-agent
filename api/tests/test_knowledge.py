@@ -82,22 +82,26 @@ class BusinessKnowledgeTests(unittest.TestCase):
             self.assertTrue(term.definition)
             self.assertTrue(set(term.related_fields) <= described_fields)
 
-    def test_training_pairs_match_all_frozen_success_cases(self) -> None:
+    def test_training_pairs_cover_only_the_original_frozen_success_cases(self) -> None:
         cases = load_cases(PROJECT_ROOT / "evals/cases.jsonl")
         validate_case_contract(cases)
         expected = [
             (case["case_id"], case["question"], case["reference_sql"])
             for case in cases
-            if case["category"] == "success"
+            if case["case_id"] in {f"success-{index:03d}" for index in range(1, 9)}
         ]
+        training_pairs = load_business_knowledge().training_pairs
         actual = [
             (pair.source_case_id, pair.question, pair.sql)
-            for pair in load_business_knowledge().training_pairs
+            for pair in training_pairs
         ]
 
         self.assertEqual(actual, expected)
+        self.assertTrue(all(pair.enabled for pair in training_pairs))
         self.assertTrue(
-            all(pair.enabled for pair in load_business_knowledge().training_pairs)
+            {f"success-{index:03d}" for index in range(9, 13)}.isdisjoint(
+                {pair.source_case_id for pair in training_pairs}
+            )
         )
 
     def test_similar_question_recalls_enabled_training_pair(self) -> None:

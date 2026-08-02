@@ -10,8 +10,8 @@
 `answer-v1`。高行数和写操作查询会在执行前持久化挂起，人工批准仍不能绕过机械只读边界。
 
 首次 20 条固定模型基线为执行成功率 `7/8`、答案正确率 `14/20`、人工介入率 `7/20`；它只代表
-冻结合成集上的单次结果，不构成生产稳定性主张。FastAPI 只读查询核心已提供任务摘要列表和完整
-run/trajectory 回查；可独立启动的服务装配、网页和 Docker 仍待实现。当前回答是确定性结果投影，
+冻结合成集上的单次结果，不构成生产稳定性主张。FastAPI 只读服务已提供 health、任务摘要列表和
+完整 run/trajectory 回查；网页和 Docker 仍待实现。当前回答是确定性结果投影，
 不是 LLM 自由回答；SHA-256 用于稳定绑定和变化检测，不是数字签名，也不证明 SQL 或答案的业务
 语义正确。
 
@@ -37,6 +37,23 @@ $env:PYTHONPATH = "api/src"
 ```
 
 第二条命令会创建新的合成数据库；目标文件已存在时会失败，避免意外覆盖。
+
+## 启动只读 API
+
+下面的业务库与 checkpoint 必须已经存在；服务只读打开二者，缺失时启动失败且不会创建文件。
+
+```powershell
+$env:PYTHONPATH = "api/src"
+& $python -m auditable_nl2sql.server `
+  --business-database .local/demo.sqlite3 `
+  --checkpoint-database .local/workflow.sqlite3 `
+  --host 127.0.0.1 `
+  --port 8000
+```
+
+安装项目后也可使用等价入口 `auditable-nl2sql-api`。启动成功后，
+`GET http://127.0.0.1:8000/api/v1/health` 返回服务版本和 `read_only=true`；服务不提供 run 创建或
+审批接口。
 
 当前事实与下一步见 [`docs/status.md`](docs/status.md)。
 

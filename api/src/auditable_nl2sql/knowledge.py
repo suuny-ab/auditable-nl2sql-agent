@@ -10,6 +10,8 @@ from functools import lru_cache
 from importlib import resources
 from typing import Any
 
+from .schema_knowledge import SchemaKnowledgeError, build_schema_knowledge
+
 
 BUSINESS_CONTEXT_SCHEMA_VERSION = "business-context-v3"
 BUSINESS_TERMS_SCHEMA_VERSION = "business-terms-v1"
@@ -503,10 +505,26 @@ def build_business_context(
     normalized_question = _require_text(question, "question").casefold()
     knowledge = load_business_knowledge()
     available_fields = _available_field_references(schema_snapshot)
+    packaged_field_references = {
+        description.reference for description in knowledge.field_descriptions
+    }
+    use_packaged_knowledge = available_fields <= packaged_field_references
+    if use_packaged_knowledge:
+        terms = knowledge.terms
+        descriptions = knowledge.field_descriptions
+    else:
+        try:
+            derived = build_schema_knowledge(schema_snapshot)
+        except SchemaKnowledgeError as exc:
+            raise BusinessKnowledgeError(
+                "Schema-derived business knowledge is invalid"
+            ) from exc
+        terms = derived.candidate_terms
+        descriptions = derived.field_descriptions
     matched_terms: list[dict[str, Any]] = []
     related_fields: set[str] = set()
 
-    for term in knowledge.terms:
+    for term in terms:
         matched_by = [
             alias
             for alias in (term.term, *term.synonyms)
@@ -525,7 +543,7 @@ def build_business_context(
 
     notes_by_reference = {
         description.reference: description
-        for description in knowledge.field_descriptions
+        for description in descriptions
     }
     field_notes = []
     for reference in sorted(related_fields & available_fields):
@@ -566,8 +584,12 @@ def build_business_context(
         "matched_terms": matched_terms,
         "field_notes": field_notes,
         "enum_values": enum_matches[:ENUM_VALUE_MAX_MATCHES],
-        "training_examples": retrieve_training_examples(
-            question,
-            training_pairs=knowledge.training_pairs,
+        "training_examples": (
+            retrieve_training_examples(
+                question,
+                training_pairs=knowledge.training_pairs,
+            )
+            if use_packaged_knowledge
+            else []
         ),
     }

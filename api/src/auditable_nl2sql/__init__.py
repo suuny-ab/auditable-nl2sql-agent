@@ -69,6 +69,14 @@ from .provider import (
     SqlGenerationError,
     SqlGenerationResult,
 )
+from .schema_knowledge import (
+    SCHEMA_KNOWLEDGE_SCHEMA_VERSION,
+    SchemaCandidateTerm,
+    SchemaDerivedKnowledge,
+    SchemaFieldDescription,
+    SchemaKnowledgeError,
+    build_schema_knowledge,
+)
 from .workflow import (
     CANONICAL_QUESTION,
     CANONICAL_SQL,
@@ -143,6 +151,12 @@ __all__ = [
     "ProviderTransportError",
     "SqlGenerationError",
     "SqlGenerationResult",
+    "SCHEMA_KNOWLEDGE_SCHEMA_VERSION",
+    "SchemaCandidateTerm",
+    "SchemaDerivedKnowledge",
+    "SchemaFieldDescription",
+    "SchemaKnowledgeError",
+    "build_schema_knowledge",
     "CANONICAL_QUESTION",
     "CANONICAL_SQL",
     "DEFAULT_APPROVAL_ROW_LIMIT",

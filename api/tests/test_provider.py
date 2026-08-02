@@ -254,13 +254,21 @@ class ProviderContractTests(unittest.TestCase):
         self.assertIn("equality-filter hints only", system_prompt)
         self.assertIn("never treat an alias as a stored value", system_prompt)
 
-    def test_local_intent_policy_stops_three_misroutes_before_transport(self) -> None:
+    def test_local_intent_policy_stops_five_misroutes_before_transport(self) -> None:
         cases = {
             "销售额是多少？": ("clarify", "revenue-scope-required"),
             "最畅销的商品是什么？": ("clarify", "best-seller-metric-required"),
             "2027年第一季度的销售额是多少？": (
                 "no_answer",
                 "synthetic-order-year-outside-coverage",
+            ),
+            "2026年第一季度非取消订单中，折扣最大的商品是什么？": (
+                "clarify",
+                "discount-metric-required",
+            ),
+            "2026年3月客户复购情况怎么样？": (
+                "clarify",
+                "repeat-purchase-definition-required",
             ),
         }
         for question, (action, rule_id) in cases.items():
@@ -280,7 +288,7 @@ class ProviderContractTests(unittest.TestCase):
                         "provider": "local-intent-policy",
                         "requested_model": "deepseek-v4-flash",
                         "provider_called": False,
-                        "policy_schema_version": "intent-policy-v1",
+                        "policy_schema_version": "intent-policy-v2",
                         "policy_rule_id": rule_id,
                         "action": action,
                         "reason": caught.exception.receipt["reason"],
@@ -489,6 +497,16 @@ class ProviderWorkflowTests(unittest.TestCase):
                 "2027年第一季度的销售额是多少？",
                 "no_answer",
                 "no_answer",
+            ),
+            "ambiguous-discount": (
+                "2026年第一季度非取消订单中，折扣最大的商品是什么？",
+                "clarification_required",
+                "clarify",
+            ),
+            "ambiguous-repeat-purchase": (
+                "2026年3月客户复购情况怎么样？",
+                "clarification_required",
+                "clarify",
             ),
         }
         for name, (question, status, action) in cases.items():

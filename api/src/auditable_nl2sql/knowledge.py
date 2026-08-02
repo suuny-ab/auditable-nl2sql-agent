@@ -350,8 +350,8 @@ def load_business_knowledge() -> BusinessKnowledge:
     }:
         raise BusinessKnowledgeError("Training pair similarity contract changed")
     raw_pairs = training_payload["pairs"]
-    if not isinstance(raw_pairs, list) or len(raw_pairs) != 12:
-        raise BusinessKnowledgeError("Training pairs must contain exactly 12 entries")
+    if not isinstance(raw_pairs, list) or len(raw_pairs) != 16:
+        raise BusinessKnowledgeError("Training pairs must contain exactly 16 entries")
 
     training_pairs: list[TrainingPair] = []
     source_case_ids: set[str] = set()
@@ -376,8 +376,10 @@ def load_business_knowledge() -> BusinessKnowledge:
             raise BusinessKnowledgeError("Training pair source must be a success case")
         if type(enabled) is not bool:
             raise BusinessKnowledgeError("Training pair enabled flag must be boolean")
-        if not sql.casefold().startswith("select "):
-            raise BusinessKnowledgeError("Training pair SQL must be read-only SELECT")
+        if not sql.casefold().startswith(("select ", "with ")):
+            raise BusinessKnowledgeError(
+                "Training pair SQL must be a read-only SELECT or CTE"
+            )
         if source_case_id in source_case_ids:
             raise BusinessKnowledgeError("Training pair source case IDs must be unique")
         if question in training_questions:
@@ -392,8 +394,8 @@ def load_business_knowledge() -> BusinessKnowledge:
                 enabled=enabled,
             )
         )
-    if source_case_ids != {f"success-{index:03d}" for index in range(1, 13)}:
-        raise BusinessKnowledgeError("Training pairs must cover success-001 through 012")
+    if source_case_ids != {f"success-{index:03d}" for index in range(1, 17)}:
+        raise BusinessKnowledgeError("Training pairs must cover success-001 through 016")
     return BusinessKnowledge(
         terms=tuple(terms),
         field_descriptions=tuple(descriptions),

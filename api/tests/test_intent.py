@@ -51,6 +51,38 @@ class IntentPolicyTests(unittest.TestCase):
         self.assertEqual(decision.action, "no_answer")
         self.assertEqual(decision.rule_id, "synthetic-order-year-outside-coverage")
 
+    def test_discount_ranking_without_metric_requires_clarification(self) -> None:
+        decision = classify_question_intent(
+            "2026年第一季度非取消订单中，折扣最大的商品是什么？"
+        )
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.action, "clarify")
+        self.assertEqual(decision.rule_id, "discount-metric-required")
+        self.assertIsNone(
+            classify_question_intent(
+                "2026年第一季度非取消订单中，单件优惠金额最大的商品是什么？"
+            )
+        )
+        self.assertIsNone(
+            classify_question_intent(
+                "2026年第一季度非取消订单中，折扣率最高的商品是什么？"
+            )
+        )
+
+    def test_repeat_purchase_without_definition_requires_clarification(self) -> None:
+        decision = classify_question_intent("2026年3月客户复购情况怎么样？")
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.action, "clarify")
+        self.assertEqual(decision.rule_id, "repeat-purchase-definition-required")
+        self.assertIsNone(classify_question_intent("2026年3月客户复购率是多少？"))
+        self.assertIsNone(
+            classify_question_intent(
+                "把同月下单至少两笔定义为复购，2026年3月复购客户数是多少？"
+            )
+        )
+
     def test_scoped_success_questions_continue_to_provider(self) -> None:
         questions = (
             "2026年第一季度非取消订单销售额是多少？",

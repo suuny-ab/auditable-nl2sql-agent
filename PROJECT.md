@@ -61,6 +61,9 @@ LangGraph 工作流生成 SQL，在只读沙箱中执行，并把查询、结果
 - 正式 `DeepSeekSqlGenerator` 默认禁用，显式启用后读取环境凭据；严格校验 JSON plan 与 usage，
   并把脱敏 Provider 回执写入 trajectory。真实收入查询已完成 evidence/answer，真实删除请求在
   `draft_sql` 阶段阻断且执行次数为 0。
+- 版本化合成知识层包含 10 条电商术语和 4 张表全部 17 个字段备注；SQL generator 只把当前问题
+  命中的术语定义及其相关字段备注注入严格 JSON 输入，未命中时提供空的有界业务上下文。它不含
+  真实企业知识、枚举值索引、训练对、记忆或技能。
 - 候选五类 Provider action 的最小探针中，歧义、无答案、越权删除和提示词注入 4 条真实调用
   分别得到 `clarify`、`no_answer`、`unsafe_operation`、`block`；所有执行次数为 0，业务库不变。
   该探针本身只排除了分类可分性的最小风险，不代表正式决策终态合同或模型评测指标已经实现。

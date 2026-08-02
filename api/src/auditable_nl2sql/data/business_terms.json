@@ -1,0 +1,65 @@
+{
+  "schema_version": "business-terms-v1",
+  "terms": [
+    {
+      "term": "销售额",
+      "synonyms": ["营收", "收入", "GMV"],
+      "definition": "订单商品明细的 quantity 乘以 unit_price 后求和；默认排除 cancelled 订单。",
+      "related_fields": ["order_items.quantity", "order_items.unit_price", "orders.order_id", "orders.status"]
+    },
+    {
+      "term": "非取消订单",
+      "synonyms": ["有效订单", "剔除取消订单"],
+      "definition": "orders.status 不等于 cancelled 的订单。",
+      "related_fields": ["orders.status", "orders.order_id"]
+    },
+    {
+      "term": "订单",
+      "synonyms": ["销售订单", "订单笔数"],
+      "definition": "orders 表中的一条销售订单记录；订单数量按 order_id 计数。",
+      "related_fields": ["orders.order_id", "orders.order_date", "orders.status", "orders.customer_id"]
+    },
+    {
+      "term": "订单商品明细",
+      "synonyms": ["订单明细", "行项目", "订单行"],
+      "definition": "order_items 表中的订单与商品明细，一行由 order_id 和 product_id 唯一确定。",
+      "related_fields": ["order_items.order_id", "order_items.product_id", "order_items.quantity", "order_items.unit_price"]
+    },
+    {
+      "term": "商品",
+      "synonyms": ["产品", "SKU"],
+      "definition": "products 表中的合成商品主数据。",
+      "related_fields": ["products.product_id", "products.product_name", "products.category", "products.list_price"]
+    },
+    {
+      "term": "销售渠道",
+      "synonyms": ["渠道", "下单渠道"],
+      "definition": "订单产生的渠道，记录在 orders.sales_channel。",
+      "related_fields": ["orders.sales_channel", "orders.order_id"]
+    },
+    {
+      "term": "客户",
+      "synonyms": ["买家", "购买客户"],
+      "definition": "customers 表中的合成购买主体，通过 customer_id 与订单关联。",
+      "related_fields": ["customers.customer_id", "customers.customer_name", "orders.customer_id"]
+    },
+    {
+      "term": "区域",
+      "synonyms": ["地区", "大区"],
+      "definition": "客户所属的合成地理区域，记录在 customers.region。",
+      "related_fields": ["customers.region", "customers.customer_id"]
+    },
+    {
+      "term": "客户分群",
+      "synonyms": ["客户类型", "客群"],
+      "definition": "客户的合成业务分群，记录在 customers.segment。",
+      "related_fields": ["customers.segment", "customers.customer_id"]
+    },
+    {
+      "term": "客单价",
+      "synonyms": ["平均订单金额", "AOV"],
+      "definition": "非取消订单销售额除以非取消订单数；分子按实际成交单价计算。",
+      "related_fields": ["orders.order_id", "orders.status", "order_items.quantity", "order_items.unit_price"]
+    }
+  ]
+}

@@ -23,3 +23,8 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
 首次固定 20 条 DeepSeek 基线已完成：执行成功率 `7/8`、答案正确率 `14/20`、人工介入率
 `7/20`，20 次调用合计 `19231` tokens，自动重试为 `0`。这是单次冻结合成集结果，不代表生产
 可靠性；完整判定与安全回执见 [`docs/work/model-eval-runner.md`](../docs/work/model-eval-runner.md)。
+
+训练对召回合入后的唯一复跑 `trainpair-20260802T134352Z` 使用同一 20 条冻结集且自动重试为 `0`：
+执行成功率 `8/8`、答案正确率 `17/20`、人工介入率 `4/20`，20 次调用合计 `24379` tokens。
+业务库哈希不变且越权执行为 `0`；完整前后对比、剩余错误和报告哈希见
+[`docs/work/training-pair-frozen-eval.md`](../docs/work/training-pair-frozen-eval.md)。

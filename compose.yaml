@@ -1,0 +1,22 @@
+name: auditable-nl2sql
+
+services:
+  api:
+    image: auditable-nl2sql-api:local
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      args:
+        VCS_REF: ${AUDITABLE_NL2SQL_VCS_REF:-local}
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - 127.0.0.1:${AUDITABLE_NL2SQL_API_PORT:-8000}:8000
+    pids_limit: 160
+    stop_grace_period: 20s

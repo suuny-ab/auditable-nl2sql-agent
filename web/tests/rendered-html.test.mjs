@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-const root = new URL("../", import.meta.url);
-
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -32,7 +30,7 @@ test("server-renders the complete audited replay", async () => {
 
   const html = await response.text();
   assert.match(html, /<html[^>]*lang="zh-CN"/i);
-  assert.match(html, /<title>Auditable NL2SQL · 从问题到证据链<\/title>/i);
+  assert.match(html, /<title>Auditable NL2SQL · 验证弧线与证据链<\/title>/i);
   assert.match(html, /把一句业务问题/);
   assert.match(html, /变成一条可回查的答案链/);
   assert.match(html, /container-demo-run/);
@@ -47,6 +45,46 @@ test("server-renders the complete audited replay", async () => {
   assert.match(html, /http:\/\/localhost:3000\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|react-loading-skeleton/);
   assert.doesNotMatch(html, /<form\b|<input\b/);
+});
+
+test("renders the validation arc with evidence and honest generalization boundaries", async () => {
+  const response = await render();
+  const html = await response.text();
+
+  const scores = ["14/20", "17/20", "20/20", "30/30", "40/40"];
+  let cursor = -1;
+  for (const score of scores) {
+    const next = html.indexOf(score, cursor + 1);
+    assert.ok(next > cursor, `${score} should appear in validation order`);
+    cursor = next;
+  }
+
+  const evidencePaths = [
+    ["model-eval-runner.md", "9"],
+    ["training-pair-frozen-eval.md", "19"],
+    ["intent-routing-fix.md", "20"],
+    ["unseen-success-fix.md", "23"],
+    ["hardcase-fix.md", "25"],
+    ["schema-summary-injection.md", "30"],
+    ["paraphrase-synonym-coverage.md", "29"],
+  ];
+  for (const [report, pr] of evidencePaths) {
+    assert.match(
+      html,
+      new RegExp(`https://github\\.com/suuny-ab/auditable-nl2sql-agent/blob/main/docs/work/${report}`),
+    );
+    assert.match(
+      html,
+      new RegExp(`https://github\\.com/suuny-ab/auditable-nl2sql-agent/pull/${pr}`),
+    );
+  }
+
+  assert.match(html, /同一 20 题开发集/);
+  assert.match(html, /已见开发集满分 ≠ 未见泛化/);
+  assert.match(html, /成功题仍为 0\/7/);
+  assert.match(html, /投影 27\/30/);
+  assert.match(html, /仅复跑 3 条/);
+  assert.match(html, /候选假设 · 未实现/);
 });
 
 test("removes starter artifacts and keeps local scripts cross-platform", async () => {

@@ -1,0 +1,23 @@
+{
+  "schema_version": "datasource-governance-v1",
+  "datasource_id": "schema-holdout-v1",
+  "knowledge_source": "schema-derived",
+  "schema_fields": [
+    "buyer_directory.buyer_class",
+    "buyer_directory.buyer_key",
+    "buyer_directory.buyer_label",
+    "buyer_directory.market_area",
+    "merchandise.catalog_price_cents",
+    "merchandise.department",
+    "merchandise.sku",
+    "merchandise.title",
+    "transaction_lines.buyer_key",
+    "transaction_lines.occurred_on",
+    "transaction_lines.paid_unit_cents",
+    "transaction_lines.sku",
+    "transaction_lines.source_code",
+    "transaction_lines.state_code",
+    "transaction_lines.ticket_no",
+    "transaction_lines.units"
+  ]
+}

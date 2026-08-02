@@ -1,0 +1,8 @@
+{
+  "schema_version": "enum-values-v1",
+  "tables": [
+    {"name": "buyer_directory", "fields": []},
+    {"name": "merchandise", "fields": []},
+    {"name": "transaction_lines", "fields": []}
+  ]
+}

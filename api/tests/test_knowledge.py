@@ -150,6 +150,7 @@ class BusinessKnowledgeTests(unittest.TestCase):
 
     def test_enum_value_contract_rejects_unknowns_and_duplicates(self) -> None:
         resource_names = (
+            "manifest.json",
             "business_terms.json",
             "field_descriptions.json",
             "enum_values.json",
@@ -179,7 +180,11 @@ class BusinessKnowledgeTests(unittest.TestCase):
             with self.subTest(invalid_enum_values=invalid_enum_values):
                 knowledge_module.load_business_knowledge.cache_clear()
 
-                def fake_read_resource(name: str) -> object:
+                def fake_read_resource(
+                    name: str,
+                    *,
+                    datasource_id: str,
+                ) -> object:
                     if name == "enum_values.json":
                         return invalid_enum_values
                     return resources[name]
@@ -361,7 +366,8 @@ class BusinessKnowledgeTests(unittest.TestCase):
         self.assertEqual(
             context,
             {
-                "schema_version": "business-context-v3",
+                "schema_version": "business-context-v4",
+                "datasource_id": "synthetic-ecommerce-v1",
                 "matched_terms": [],
                 "field_notes": [],
                 "enum_values": [],

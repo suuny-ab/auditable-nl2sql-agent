@@ -188,7 +188,8 @@ class ProviderContractTests(unittest.TestCase):
         user_content = transport.calls[0]["messages"][1]["content"]
         request_input = json.loads(user_content.split("\n", maxsplit=1)[1])
         context = request_input["business_context"]
-        self.assertEqual(context["schema_version"], "business-context-v3")
+        self.assertEqual(context["schema_version"], "business-context-v4")
+        self.assertEqual(context["datasource_id"], "synthetic-ecommerce-v1")
         self.assertEqual(
             [term["term"] for term in context["matched_terms"]],
             ["销售额", "非取消订单", "订单", "销售渠道"],

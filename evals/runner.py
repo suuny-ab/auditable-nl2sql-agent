@@ -13,6 +13,8 @@ from typing import Any
 
 from auditable_nl2sql import (
     DEEPSEEK_DEFAULT_MODEL,
+    DEFAULT_DATASOURCE_ID,
+    SCHEMA_HOLDOUT_DATASOURCE_ID,
     DeepSeekSqlGenerator,
     WorkflowRunner,
 )
@@ -358,17 +360,14 @@ def main() -> None:
     parser.add_argument("--timeout-seconds", type=float, default=60.0)
     arguments = parser.parse_args()
 
-    generator = DeepSeekSqlGenerator.from_environment(
-        enabled=True,
-        timeout_seconds=arguments.timeout_seconds,
-        model=arguments.model,
-    )
     case_validator = validate_case_contract
     case_loader = load_cases
+    datasource_id = DEFAULT_DATASOURCE_ID
     if arguments.dataset_contract == "schema-holdout-v1":
         from evals.schema_holdout import validate_schema_holdout_contract
 
         case_validator = validate_schema_holdout_contract
+        datasource_id = SCHEMA_HOLDOUT_DATASOURCE_ID
     elif arguments.dataset_contract == "paraphrase-v1":
         from evals.paraphrase import (
             load_paraphrase_cases,
@@ -385,6 +384,12 @@ def main() -> None:
 
         case_validator = validate_revenue_paraphrase_rerun_contract
         case_loader = load_revenue_paraphrase_rerun_cases
+    generator = DeepSeekSqlGenerator.from_environment(
+        enabled=True,
+        timeout_seconds=arguments.timeout_seconds,
+        model=arguments.model,
+        datasource_id=datasource_id,
+    )
     report = run_model_evaluation(
         arguments.dataset,
         business_database=arguments.business_database,

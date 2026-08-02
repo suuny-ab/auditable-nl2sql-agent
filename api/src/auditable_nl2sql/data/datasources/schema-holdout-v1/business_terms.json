@@ -1,0 +1,155 @@
+{
+  "schema_version": "business-terms-v1",
+  "terms": [
+    {
+      "term": "销售额",
+      "synonyms": ["营收", "收入", "GMV"],
+      "definition": "候选口径为订单行数量乘以实际成交单价后求和；金额字段以整数分保存，汇总后除以 100 换算元；是否排除取消记录由状态字段决定。",
+      "related_fields": [
+        "transaction_lines.paid_unit_cents",
+        "transaction_lines.source_code",
+        "transaction_lines.state_code",
+        "transaction_lines.ticket_no",
+        "transaction_lines.units"
+      ]
+    },
+    {
+      "term": "非取消订单",
+      "synonyms": ["有效订单", "剔除取消订单"],
+      "definition": "候选口径为通过订单/交易状态字段排除取消记录；实际状态存储值必须以可用元数据为准。",
+      "related_fields": [
+        "transaction_lines.source_code",
+        "transaction_lines.state_code",
+        "transaction_lines.ticket_no"
+      ]
+    },
+    {
+      "term": "订单",
+      "synonyms": ["销售订单", "订单笔数"],
+      "definition": "候选订单标识来自 schema 推断的订单/交易编号；明细表中统计订单数应对该标识去重。",
+      "related_fields": [
+        "buyer_directory.buyer_key",
+        "transaction_lines.buyer_key",
+        "transaction_lines.occurred_on",
+        "transaction_lines.source_code",
+        "transaction_lines.state_code",
+        "transaction_lines.ticket_no"
+      ]
+    },
+    {
+      "term": "订单商品明细",
+      "synonyms": ["订单明细", "行项目", "订单行", "行金额"],
+      "definition": "候选订单行由订单标识与商品标识关联；行金额由数量乘实际成交单价得到。",
+      "related_fields": [
+        "merchandise.sku",
+        "transaction_lines.paid_unit_cents",
+        "transaction_lines.sku",
+        "transaction_lines.source_code",
+        "transaction_lines.state_code",
+        "transaction_lines.ticket_no",
+        "transaction_lines.units"
+      ]
+    },
+    {
+      "term": "商品",
+      "synonyms": ["产品", "SKU"],
+      "definition": "候选商品主数据由商品标识与展示名称描述，目录标价不等于实际成交单价。",
+      "related_fields": [
+        "merchandise.catalog_price_cents",
+        "merchandise.department",
+        "merchandise.sku",
+        "merchandise.title",
+        "transaction_lines.sku"
+      ]
+    },
+    {
+      "term": "销售渠道",
+      "synonyms": ["渠道", "下单渠道"],
+      "definition": "候选销售渠道来自 schema 推断的渠道/来源字段。",
+      "related_fields": [
+        "transaction_lines.source_code",
+        "transaction_lines.state_code",
+        "transaction_lines.ticket_no"
+      ]
+    },
+    {
+      "term": "客户",
+      "synonyms": ["买家", "购买客户"],
+      "definition": "候选客户由客户/买方标识和展示名称描述，并通过外键与订单或交易关联。",
+      "related_fields": [
+        "buyer_directory.buyer_key",
+        "buyer_directory.buyer_label",
+        "transaction_lines.buyer_key"
+      ]
+    },
+    {
+      "term": "区域",
+      "synonyms": ["地区", "大区"],
+      "definition": "候选区域来自客户/买方的地区或市场区域字段。",
+      "related_fields": [
+        "buyer_directory.buyer_key",
+        "buyer_directory.market_area",
+        "transaction_lines.buyer_key"
+      ]
+    },
+    {
+      "term": "客户分群",
+      "synonyms": ["客户类型", "客群"],
+      "definition": "候选客户分群来自客户/买方的分类、分群或层级字段。",
+      "related_fields": [
+        "buyer_directory.buyer_class",
+        "buyer_directory.buyer_key",
+        "transaction_lines.buyer_key"
+      ]
+    },
+    {
+      "term": "客单价",
+      "synonyms": ["平均订单金额", "AOV"],
+      "definition": "候选口径为非取消销售额除以去重订单数；金额字段以整数分保存，汇总后除以 100 换算元。",
+      "related_fields": [
+        "transaction_lines.paid_unit_cents",
+        "transaction_lines.source_code",
+        "transaction_lines.state_code",
+        "transaction_lines.ticket_no",
+        "transaction_lines.units"
+      ]
+    },
+    {
+      "term": "成交单价",
+      "synonyms": ["实际成交价", "成交价", "最低成交单价", "优惠"],
+      "definition": "候选实际成交价来自订单行单价字段；与目录标价比较可计算单件优惠。",
+      "related_fields": [
+        "merchandise.catalog_price_cents",
+        "merchandise.sku",
+        "transaction_lines.paid_unit_cents",
+        "transaction_lines.sku",
+        "transaction_lines.state_code"
+      ]
+    },
+    {
+      "term": "标价",
+      "synonyms": ["目录价", "目录标价", "catalog price"],
+      "definition": "候选标价来自商品目录价格字段，不代表实际成交单价。",
+      "related_fields": [
+        "merchandise.catalog_price_cents",
+        "merchandise.sku",
+        "merchandise.title",
+        "transaction_lines.sku"
+      ]
+    },
+    {
+      "term": "数量",
+      "synonyms": ["购买数量", "件数", "quantity", "units"],
+      "definition": "候选数量来自订单行数量字段；与实际成交单价相乘可计算行金额。",
+      "related_fields": [
+        "merchandise.sku",
+        "transaction_lines.paid_unit_cents",
+        "transaction_lines.sku",
+        "transaction_lines.source_code",
+        "transaction_lines.state_code",
+        "transaction_lines.ticket_no",
+        "transaction_lines.units"
+      ]
+    }
+  ]
+}

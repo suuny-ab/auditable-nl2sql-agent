@@ -1,0 +1,39 @@
+{
+  "schema_version": "field-descriptions-v1",
+  "tables": [
+    {
+      "name": "buyer_directory",
+      "description": "由 schema 名称推断的合成客户或买方主数据表 buyer_directory。",
+      "fields": [
+        {"name": "buyer_key", "description": "客户或买方标识。"},
+        {"name": "buyer_label", "description": "客户或买方的展示名称。"},
+        {"name": "market_area", "description": "客户或买方所属地区/市场区域。"},
+        {"name": "buyer_class", "description": "客户或买方的业务分群/类别。"}
+      ]
+    },
+    {
+      "name": "merchandise",
+      "description": "由 schema 名称推断的合成商品主数据表 merchandise。",
+      "fields": [
+        {"name": "sku", "description": "商品标识。"},
+        {"name": "title", "description": "商品展示名称。"},
+        {"name": "department", "description": "商品所属品类/部门。"},
+        {"name": "catalog_price_cents", "description": "商品目录标价；不等于订单行实际成交单价。字段以整数分保存金额，换算元时除以 100。"}
+      ]
+    },
+    {
+      "name": "transaction_lines",
+      "description": "由 schema 名称推断的合成订单或交易表 transaction_lines。",
+      "fields": [
+        {"name": "ticket_no", "description": "订单或交易的标识；计数订单时通常应去重。"},
+        {"name": "buyer_key", "description": "客户或买方标识。外键关联 buyer_directory.buyer_key。"},
+        {"name": "sku", "description": "商品标识。外键关联 merchandise.sku。"},
+        {"name": "occurred_on", "description": "订单或交易发生日期/时间。"},
+        {"name": "state_code", "description": "订单或交易的标识；计数订单时通常应去重。订单或交易状态编码；用于识别取消等状态，实际存储值不能由字段名臆造。"},
+        {"name": "source_code", "description": "订单或交易的标识；计数订单时通常应去重。销售渠道或来源编码；用于按渠道筛选或分组。"},
+        {"name": "units", "description": "订单行的购买数量；与实际成交单价相乘可得到行金额。"},
+        {"name": "paid_unit_cents", "description": "订单行的实际成交单价。字段以整数分保存金额，换算元时除以 100。"}
+      ]
+    }
+  ]
+}

@@ -36,3 +36,9 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
 正确率 `20/20`、人工介入率 `4/20`；三条本地终止使真实 Provider 调用降为 `17`，自动重试仍为
 `0`，合计 `20821` tokens。越权与非成功类别 SQL 执行均为 `0`；完整边界见
 [`docs/work/intent-routing-fix.md`](../docs/work/intent-routing-fix.md)。
+
+扩充后唯一 30 题运行 `unseen30-20260802T144417Z` 形成独立首份基线：执行成功率 `12/12`、
+答案正确率 `26/30`、人工介入率 `9/30`；真实 Provider usage `27` 条、自动重试 `0`，合计
+`32969` tokens。新 10 题正确 `6/10`，越权与全部非成功 SQL 执行均为 `0`，业务库哈希不变；
+它不替换旧 20 题结果。完整错误与报告哈希见
+[`docs/work/frozen-eval-30.md`](../docs/work/frozen-eval-30.md)。

@@ -58,10 +58,25 @@
   Compose config、Web 构建与 SSR `2/2`、strict JSONL、凭据扫描、产品反向导入检查和
   `git diff --check` 均通过。产品 `api/src`、知识 JSON、Provider、工作流与依赖均未修改。
 - 此阶段只运行确定性本地验证，真实 Provider 调用、usage、token 与费用均为 `0`。
+- 题集与本地证据先冻结为提交 `7a380f222eb4a04d898fa9d9ff0b9b5f014ff4bb`，真实评测没有修改
+  题面、gold、产品代码或知识文件。
 
 ## Single-run evaluation evidence
 
-待唯一一轮真实评测后填写。
+- 唯一轮次 `unseen30-20260802T144417Z` 对 30 条案例各运行一次；3 条旧题由确定性意图门本地处理，
+  真实 Provider usage 回执为 `27` 条，自动重试 `0`，未补跑、未调参、未改题。
+- 扩充后首份基线：执行成功率 `12/12 = 1.000`、答案正确率 `26/30 = 0.867`、人工介入率
+  `9/30 = 0.300`；prompt `30577`、completion `2392`、total `32969` tokens。
+- 新增 10 条中 `6/10` 判定正确：歧义、无答案、越权、注入共 6 条全部命中且零执行；4 条成功
+  查询均执行成功并返回正确数据，但生成 SQL 都因无有界 `LIMIT` 触发非预期审批，`success-009`
+  另有 `month` / `order_month` 列别名差异，`success-011` 另有 `quantity_count` / `units_sold` 差异。
+  这些真实误差原样保留，未修改题面或判分。
+- 4 条越权案例执行次数全部为 `0`，非成功类别 SQL 执行总数为 `0`；30 条逐案例及整轮业务库
+  SHA-256 始终为 `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`。
+- Git 忽略报告位于
+  `.local/model-eval-runner/runs/unseen30-20260802T144417Z/report.json`，SHA-256 为
+  `7fbe51e8be2a032307066085ceefe9b7d5a44478bf30f52591de04e77ffd2404`；敏感标记扫描无命中。
+  该 `26/30` 是扩充后独立基线，不替换或倒写同一旧 20 题上的 `20/20`。
 
 ## Remote evidence
 

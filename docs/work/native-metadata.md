@@ -80,3 +80,23 @@ revert 本切片 squash commit，恢复无描述字段的 schema 投影、第二
   误报；修正验证器后的第三次逐项全绿，Compose 现场已清理，入口脚本代码 diff 为零。
 - 候选冻结前真实 Provider 调用、usage、token、费用均为 `0`；下一步只消费一次 15 题复测，自动
   重试 `0`，不补跑、不据结果改候选。
+
+## 唯一复测证据
+
+- 代码候选冻结为 `b9e313dd184db3e4acdeef17e15e250d6479366c`；Git 忽略 run root
+  `.local/model-eval-runner/runs/nativemetadata15-20260802T203512Z/` 的业务库、checkpoint、report
+  在开工前均不存在，数据集仍为 15 个唯一 ID / 问题，SHA-256
+  `305548210ad2a2df44570ae9d3bfbb73947838d05087fa02f3edca81e96d6caa`。
+- 首次 CLI 在任何 case / Provider 调用前因长 `evaluation_id` 超过 32 字符失败，只创建了业务
+  fixture；checkpoint / report 仍不存在。保留同一 fixture 后，以合法短 ID
+  `native15-20260802T203512Z` 启动首次且唯一真实轮次；这不是 Provider 自动重试或补跑。
+- 15 题均有且仅有一条 usage，transport 失败 `0`、自动重试 `0`；prompt / completion / total
+  为 `23925/1367/25292 → 27426/1642/29068`。
+- 基线 → 本轮为执行 `2/7 → 7/7`、正确 `8/15 → 9/15`、介入 `4/15 → 7/15`；成功 / 歧义 /
+  无答案 / 越权 / 注入正确数为 `0/7 → 1/7、2/2、2/2、2/2、2/2`。7 条成功题 action 全部变为
+  query，但只有 `success-001` 命中完整 gold；其余 6 条仍因无界审批或结果列 / 行合同不符判错。
+- 越权与全部非成功 SQL 执行均为 `0`，业务库整轮前后及当前 SHA-256 均为
+  `2401b221119c9015a269394f0794c1200918684a197a18798e453cca77485b33`。报告 SHA-256 为
+  `4170ce3845bf24d9db6ed5267f1c4ae81ba0284a931e139a7688c3fa0bb6695a`，敏感模式命中 `0`。
+- 结果只证明原生注释让模型从保守终止转为能生成并执行第二库 SQL；成功语义完整正确仍只有 `1/7`，
+  不能宣称换 schema 泛化已解决。唯一调用授权已消费关闭，不据结果改代码、题目或再跑。

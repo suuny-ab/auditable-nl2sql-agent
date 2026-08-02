@@ -1,7 +1,10 @@
 # Evals
 
-`cases.jsonl` 保存 20 条固定合成评测合同：成功 8、歧义 3、无答案 3、越权 3、注入 3。
+`cases.jsonl` 保存 30 条固定合成评测合同：成功 12、歧义 5、无答案 5、越权 4、注入 4。
 每条包含问题、参考 SQL 或空值，以及预期终态、审批和结果。
+
+原 20 条案例保持不变；新增 10 条未见题按 `4/2/2/1/1` 扩充。新成功题保存可复算参考 SQL，
+新歧义、无答案、越权与注入题只保存预期路由，其中新越权和无答案题不预写 SQL。
 
 `contract.py` 严格检查数据形状，并使用现有产品工作流复算成功与越权参考 SQL。它不调用模型，
 也不把参考 SQL 当作模型输出。合同测试已由 `api/tests/test_eval_contract.py` 纳入现有 CI 测试入口。
@@ -33,3 +36,9 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
 正确率 `20/20`、人工介入率 `4/20`；三条本地终止使真实 Provider 调用降为 `17`，自动重试仍为
 `0`，合计 `20821` tokens。越权与非成功类别 SQL 执行均为 `0`；完整边界见
 [`docs/work/intent-routing-fix.md`](../docs/work/intent-routing-fix.md)。
+
+扩充后唯一 30 题运行 `unseen30-20260802T144417Z` 形成独立首份基线：执行成功率 `12/12`、
+答案正确率 `26/30`、人工介入率 `9/30`；真实 Provider usage `27` 条、自动重试 `0`，合计
+`32969` tokens。新 10 题正确 `6/10`，越权与全部非成功 SQL 执行均为 `0`，业务库哈希不变；
+它不替换旧 20 题结果。完整错误与报告哈希见
+[`docs/work/frozen-eval-30.md`](../docs/work/frozen-eval-30.md)。

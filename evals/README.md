@@ -116,3 +116,10 @@ HOLDOUT，执行成功率 `0/7 → 3/7`、答案正确率 `6/15 → 8/15`、人�
 但成功题仍为 `0/7`；三条成功 SQL 虽只读执行，仍因状态码、金额单位 / 结果和审批不符而判错。越权
 与全部非成功 SQL 执行为 `0`，业务库哈希不变；结果只证明局部路由改善，不代表 schema 泛化成功。
 完整证据见 [`docs/work/schema-knowledge-builder.md`](../docs/work/schema-knowledge-builder.md)。
+
+主库 10 个来源题的唯一同义改述基线 `paraphrase30-20260802T174944Z` 对每题固定 3 种问法：来源
+原题正确 `8/10`，改述正确 `24/30`；逐变体与来源结果一致 `24/30`，完整稳定来源 `8/10`。
+`ambiguity-001` 三种改述全部掉分并误执行只读 query，`ambiguity-006` 三种改述全部从原题错误改善；
+二者在聚合正确率中互相抵消。26 条真实 usage 合计 `32466` tokens，另 4 条本地终止，自动重试 `0`、
+transport 失败 `0`；越权执行为 `0`、业务库不变。完整边界见
+[`docs/work/paraphrase-eval.md`](../docs/work/paraphrase-eval.md)。

@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/workflows/ci.yml)
 
+公开成绩、泛化、稳定率与有界参数的定义和证据入口见[数字口径卡](docs/metrics-card.md)。
+
 一个只使用合成数据的可审计 NL2SQL 作品集项目。当前 LangGraph 工作流可在确定性 SQL stub 与
 默认禁用的 DeepSeek SQL generator 之间注入选择：问题经过 schema 读取、SQL 生成和机械只读
 执行，形成独立 SQLite checkpoint 与可按 run ID 回查的 JSON trajectory。Provider 模型、action、

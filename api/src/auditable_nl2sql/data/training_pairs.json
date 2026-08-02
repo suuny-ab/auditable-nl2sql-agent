@@ -77,6 +77,30 @@
       "question": "哪些客户在2026年3月有非取消订单？列出客户、订单数和销售额，按销售额降序。",
       "sql": "SELECT customer.customer_name, COUNT(DISTINCT sales_order.order_id) AS order_count, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) JOIN customers AS customer USING (customer_id) WHERE sales_order.status != 'cancelled' AND sales_order.order_date >= '2026-03-01' AND sales_order.order_date < '2026-04-01' GROUP BY customer.customer_id, customer.customer_name ORDER BY revenue DESC, customer.customer_id LIMIT 5",
       "enabled": true
+    },
+    {
+      "source_case_id": "success-013",
+      "question": "非取消订单中，哪些商品曾低于标价成交？列出商品、标价、最低成交单价和最大单件优惠，按最大单件优惠降序。",
+      "sql": "SELECT product.product_name, product.list_price, ROUND(MIN(item.unit_price), 2) AS min_unit_price, ROUND(product.list_price - MIN(item.unit_price), 2) AS max_unit_discount FROM products AS product JOIN order_items AS item USING (product_id) JOIN orders AS sales_order USING (order_id) WHERE sales_order.status != 'cancelled' GROUP BY product.product_id, product.product_name, product.list_price HAVING MIN(item.unit_price) < product.list_price ORDER BY max_unit_discount DESC, product.product_id LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-014",
+      "question": "非取消订单中，按客户分群统计订单数、销售额和平均每单销售额，按平均每单销售额降序列出。",
+      "sql": "SELECT customer.segment, COUNT(DISTINCT sales_order.order_id) AS order_count, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue, ROUND(SUM(item.quantity * item.unit_price) / COUNT(DISTINCT sales_order.order_id), 2) AS avg_order_revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) JOIN customers AS customer USING (customer_id) WHERE sales_order.status != 'cancelled' GROUP BY customer.segment ORDER BY avg_order_revenue DESC, customer.segment LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-015",
+      "question": "非取消订单中，订单销售额不少于1000元的订单有哪些？列出订单、客户、状态和销售额，按销售额降序。",
+      "sql": "SELECT sales_order.order_id, customer.customer_name, sales_order.status, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) JOIN customers AS customer USING (customer_id) WHERE sales_order.status != 'cancelled' GROUP BY sales_order.order_id, customer.customer_name, sales_order.status HAVING SUM(item.quantity * item.unit_price) >= 1000 ORDER BY revenue DESC, sales_order.order_id LIMIT 5",
+      "enabled": true
+    },
+    {
+      "source_case_id": "success-016",
+      "question": "非取消订单中，每个销售渠道销售额最高的一笔订单是哪笔？列出渠道、订单号和订单销售额；并列按订单号升序，每个渠道只取一笔，最后按渠道升序。",
+      "sql": "WITH order_revenue AS (SELECT sales_order.sales_channel, sales_order.order_id, ROUND(SUM(item.quantity * item.unit_price), 2) AS revenue FROM order_items AS item JOIN orders AS sales_order USING (order_id) WHERE sales_order.status != 'cancelled' GROUP BY sales_order.sales_channel, sales_order.order_id), ranked AS (SELECT sales_channel, order_id, revenue, ROW_NUMBER() OVER (PARTITION BY sales_channel ORDER BY revenue DESC, order_id) AS revenue_rank FROM order_revenue) SELECT sales_channel, order_id, revenue FROM ranked WHERE revenue_rank = 1 ORDER BY sales_channel LIMIT 5",
+      "enabled": true
     }
   ]
 }

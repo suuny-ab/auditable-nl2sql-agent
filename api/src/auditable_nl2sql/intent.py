@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date
 
 
-INTENT_POLICY_SCHEMA_VERSION = "intent-policy-v1"
+INTENT_POLICY_SCHEMA_VERSION = "intent-policy-v2"
 SYNTHETIC_ORDER_DATE_START = date(2026, 1, 5)
 SYNTHETIC_ORDER_DATE_END = date(2026, 3, 16)
 
@@ -35,6 +35,32 @@ _BEST_SELLER_METRICS = (
     "销量",
     "数量",
     "件数",
+)
+_DISCOUNT_TERMS = ("折扣", "优惠")
+_DISCOUNT_RANKING_TERMS = ("最大", "最高", "最多")
+_DISCOUNT_METRICS = (
+    "折扣率",
+    "优惠率",
+    "折扣金额",
+    "优惠金额",
+    "单件折扣",
+    "单件优惠",
+    "比例",
+    "金额",
+)
+_REPEAT_PURCHASE_TERMS = ("复购",)
+_VAGUE_ANALYSIS_TERMS = ("情况", "怎么样", "如何", "表现")
+_REPEAT_PURCHASE_QUALIFIERS = (
+    "复购率",
+    "复购客户数",
+    "复购人数",
+    "复购订单数",
+    "至少两笔",
+    "至少2笔",
+    "两次下单",
+    "重复下单",
+    "定义为",
+    "口径",
 )
 
 
@@ -83,6 +109,26 @@ def _is_unqualified_best_seller_question(normalized: str) -> bool:
     )
 
 
+def _is_unqualified_discount_ranking_question(normalized: str) -> bool:
+    return (
+        any(term in normalized for term in _DISCOUNT_TERMS)
+        and any(term in normalized for term in _DISCOUNT_RANKING_TERMS)
+        and any(term in normalized for term in _PRODUCT_TERMS)
+        and not any(metric in normalized for metric in _DISCOUNT_METRICS)
+    )
+
+
+def _is_unqualified_repeat_purchase_question(normalized: str) -> bool:
+    return (
+        any(term in normalized for term in _REPEAT_PURCHASE_TERMS)
+        and any(term in normalized for term in _VAGUE_ANALYSIS_TERMS)
+        and not any(
+            qualifier in normalized
+            for qualifier in _REPEAT_PURCHASE_QUALIFIERS
+        )
+    )
+
+
 def classify_question_intent(question: str) -> IntentDecision | None:
     """Return one bounded local decision, or ``None`` for normal Provider routing."""
 
@@ -113,6 +159,24 @@ def classify_question_intent(question: str) -> IntentDecision | None:
             reason=(
                 "Best-selling product is ambiguous until revenue or quantity is "
                 "selected as the ranking metric."
+            ),
+        )
+    if _is_unqualified_discount_ranking_question(normalized):
+        return IntentDecision(
+            rule_id="discount-metric-required",
+            action="clarify",
+            reason=(
+                "Maximum discount is ambiguous until amount or rate and the "
+                "aggregation scope are specified."
+            ),
+        )
+    if _is_unqualified_repeat_purchase_question(normalized):
+        return IntentDecision(
+            rule_id="repeat-purchase-definition-required",
+            action="clarify",
+            reason=(
+                "Repeat purchase requires an explicit repeat definition or a "
+                "specific metric such as customer count or repeat-purchase rate."
             ),
         )
     return None

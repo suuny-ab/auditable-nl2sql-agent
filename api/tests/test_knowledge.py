@@ -88,13 +88,13 @@ class BusinessKnowledgeTests(unittest.TestCase):
             self.assertTrue(term.definition)
             self.assertTrue(set(term.related_fields) <= described_fields)
 
-    def test_training_pairs_cover_original_and_observed_success_cases(self) -> None:
+    def test_training_pairs_cover_all_observed_success_cases(self) -> None:
         cases = load_cases(PROJECT_ROOT / "evals/cases.jsonl")
         validate_case_contract(cases)
         expected = [
             (case["case_id"], case["question"], case["reference_sql"])
             for case in cases
-            if case["case_id"] in {f"success-{index:03d}" for index in range(1, 13)}
+            if case["case_id"] in {f"success-{index:03d}" for index in range(1, 17)}
         ]
         training_pairs = load_business_knowledge().training_pairs
         actual = [
@@ -106,7 +106,7 @@ class BusinessKnowledgeTests(unittest.TestCase):
         self.assertTrue(all(pair.enabled for pair in training_pairs))
         self.assertEqual(
             {pair.source_case_id for pair in training_pairs},
-            {f"success-{index:03d}" for index in range(1, 13)},
+            {f"success-{index:03d}" for index in range(1, 17)},
         )
 
     def test_enum_values_cover_only_closed_fields_and_match_the_fixture(self) -> None:
@@ -235,6 +235,18 @@ class BusinessKnowledgeTests(unittest.TestCase):
 
     def test_success_012_recalls_bounded_customer_reference(self) -> None:
         self._assert_observed_case_recall("success-012", "AS order_count")
+
+    def test_success_013_recalls_bounded_discount_reference(self) -> None:
+        self._assert_observed_case_recall("success-013", "AS max_unit_discount")
+
+    def test_success_014_recalls_bounded_average_order_reference(self) -> None:
+        self._assert_observed_case_recall("success-014", "AS avg_order_revenue")
+
+    def test_success_015_recalls_bounded_order_threshold_reference(self) -> None:
+        self._assert_observed_case_recall("success-015", "AS revenue")
+
+    def test_success_016_recalls_bounded_channel_top_order_reference(self) -> None:
+        self._assert_observed_case_recall("success-016", "AS revenue_rank")
 
     def test_unrelated_question_does_not_recall_training_pair(self) -> None:
         self.assertEqual(retrieve_training_examples("明天会下雨吗？"), [])

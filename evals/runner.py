@@ -6,7 +6,7 @@ import argparse
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -34,6 +34,7 @@ _SEMANTIC_ERROR_BY_ACTION = {
     "block": "prompt_injection",
 }
 _EVALUATION_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,31}\Z")
+CaseValidator = Callable[[Iterable[Mapping[str, Any]]], None]
 
 
 class EvaluationRunnerError(RuntimeError):
@@ -152,6 +153,7 @@ def run_model_evaluation(
     checkpoint_database: str | Path,
     generator: Any,
     evaluation_id: str,
+    case_validator: CaseValidator = validate_case_contract,
 ) -> dict[str, Any]:
     """Run every frozen case exactly once through one persistent WorkflowRunner."""
 
@@ -172,7 +174,7 @@ def run_model_evaluation(
         raise EvaluationRunnerError("checkpoint database already exists")
 
     cases = load_cases(dataset)
-    validate_case_contract(cases)
+    case_validator(cases)
     database_hash_before = _sha256(business)
     case_reports: list[dict[str, Any]] = []
 
@@ -327,6 +329,11 @@ def main() -> None:
         description="Run the frozen auditable NL2SQL model evaluation once."
     )
     parser.add_argument("--dataset", type=Path, default=Path("evals/cases.jsonl"))
+    parser.add_argument(
+        "--dataset-contract",
+        choices=("frozen40", "schema-holdout-v1"),
+        default="frozen40",
+    )
     parser.add_argument("--business-database", required=True, type=Path)
     parser.add_argument("--checkpoint-database", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
@@ -341,12 +348,18 @@ def main() -> None:
         timeout_seconds=arguments.timeout_seconds,
         model=arguments.model,
     )
+    case_validator = validate_case_contract
+    if arguments.dataset_contract == "schema-holdout-v1":
+        from evals.schema_holdout import validate_schema_holdout_contract
+
+        case_validator = validate_schema_holdout_contract
     report = run_model_evaluation(
         arguments.dataset,
         business_database=arguments.business_database,
         checkpoint_database=arguments.checkpoint_database,
         generator=generator,
         evaluation_id=arguments.evaluation_id,
+        case_validator=case_validator,
     )
     written = write_evaluation_report(report, arguments.output)
     print(f"report={written}")

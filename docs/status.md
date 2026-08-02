@@ -4,30 +4,29 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `in-review` |
+| `state` | `in-progress` |
 | 更新时间 | `2026-08-03` |
-| 当前切片 | `HARDCASE-FIX-031`：修 6 条新增难题错例并唯一复跑冻结 40 题 |
-| 最近完成 | `FROZEN-EVAL-40-030`：PR #24 合并为 `42e7edaa`，main 三个 CI job 全绿 |
-| 当前状态 | 唯一复跑完成：执行 `16/16`、正确 `40/40`、介入 `6/40`，已达到远端发布门 |
-| 完成门 | 推送精确结果 head、Draft PR 三路 CI 全绿后 squash，并复核 main CI |
-| 项目基线 | `origin/main@42e7edaa25ae75c2479fe8555a602e1c93d8bf74`；main CI run `30755997930` 成功 |
-| 阻碍 | 无；唯一 Provider 授权已消费关闭，不再调用或补跑；推送与 Draft PR 已预授权 |
+| 当前切片 | `SCHEMA-HOLDOUT-032`：第二合成 schema 的 15 题一次性泛化基线 |
+| 最近完成 | `HARDCASE-FIX-031`：PR #25 合并为 `6372713a`，main 三个 CI job 全绿 |
+| 当前状态 | 第二 fixture、15 题合同、gold 复算与全量门禁通过；待冻结候选并消费唯一 HOLDOUT |
+| 完成门 | 首次 15 题泛化数字如实落盘、全量门禁通过，再完成 Draft PR、三路 CI 与 squash 合并 |
+| 项目基线 | `origin/main@6372713ac69a54d8b8a112ea79f3e80176e1e6d9`；main CI run `30756883820` 成功 |
+| 阻碍 | 无；本单授权最多 15 次 Provider 调用、自动重试 `0`，推送与 Draft PR 已预授权 |
 
 ## 当前队列
 
-- 唯一轮次 `hardfix40-20260802T162815Z`：执行 `14/16 → 16/16`、正确 `32/40 → 40/40`、
-  介入 `10/40 → 6/40`；成功 / 歧义 / 无答案 / 越权 / 注入均全对。
-- 5 条由本地意图门处理，35 条进入 Provider transport 并保存 usage；prompt / completion / total 从
-  `42410/3210/45620` 变为 `43701/3243/46944`，自动重试 `0`，没有补跑。
-- 6 条已见开发集错例全部修复；`success-010/011` 本轮 transport 正常，只证明上轮为环境抖动，
-  不归因于产品改动，也不把本轮包装为新的未见 / 泛化证据。
-- 冻结输入 SHA-256 `b3f698bc…1072ef`；越权与全部非成功 SQL 执行均为 `0`，业务库前后保持
-  `564572c5…1ea7`。报告 SHA-256 为 `72475050…c29758`，敏感模式无命中。
-- 新增 6 项逐错例定向测试全部通过；Python 全量 `95` 项测试、Web `2/2`、编译、44 包依赖、
-  strict JSON、wheel、园丁、治理、Compose 与差异门全绿，真实 Provider 调用为 `0`。
-- 唯一 Provider 授权已消费关闭；不得再运行评测、调用 Provider、调参或修改题本。
+- 第二库固定为 `buyer_directory / merchandise / transaction_lines` 三表；订单头并入行事实，金额用
+  INTEGER 分，状态 / 渠道改码，新旧表名和字段名零重合。
+- 映射集固定 15 题、类别 `7/2/2/2/2`；问题 / expected 与主库同题相同，reference SQL 只按新
+  schema 重写。主库同题对照为正确 `15/15`、成功执行 `7/7`、介入 `2/15`。
+- HOLDOUT 在真实调用前冻结；首轮结果无论高低都是最终泛化基线，不修新库、不改题 / gold、
+  不改知识 / 训练对 / prompt / 工作流，不补跑。
+- 第二库 SHA-256 `ed9a2cda…78143d`；映射集原始 / 规范化 SHA-256 为
+  `3a598167…7bb16 / 123c8317…779cd`，15 个 ID / 问题唯一，7 条成功 gold 离线复算全对。
+- Python HOLDOUT 定向 `5/5`、Python 全量 `100` 项测试通过；Web `2/2`、编译、44 包依赖、strict JSONL、
+  园丁、治理、Compose 与差异门全绿；知识、训练对、意图、Provider、工作流和主 40 题零差异。
 
 ## 下一检查点
 
-- 提交脱敏结果文档并按本单授权推送精确 head、创建 Draft PR。
-- api / web / container 三路 CI 全绿后 squash 合并，再复核 main CI。
+- 提交并冻结实现候选，创建唯一新运行目录并复核 fixture / HOLDOUT 哈希、路径和调用上限。
+- 只运行一次完整 15 题；结果无论高低都直接封存，不修改冻结资产或补跑。

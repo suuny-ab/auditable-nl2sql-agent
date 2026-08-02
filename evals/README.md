@@ -15,6 +15,11 @@
 哈希，并计算执行成功率、答案正确率和人工介入率。Provider 必须由命令行显式指定；运行器不自动
 重试、不覆盖已有 checkpoint 或报告。模拟批准只用于完成评测，不代表产品自动审批。
 
+`schema_holdout.py` 与 `schema_holdout_cases.jsonl` 是独立的换 schema 泛化考场：三张新表把订单头
+并入交易行事实，金额改为整数分，状态 / 渠道改码，且表名、字段名与主库零重合。15 个问题与主库
+来源题逐字相同，reference SQL 只按新 schema 重写；合同固定 `7/2/2/2/2` 类别和来源 ID。它不进入
+训练对，也不替换原 40 题合同。
+
 真实 DeepSeek 运行命令形状如下；数据库、checkpoint 和报告应放在 Git 忽略的 `.local/`：
 
 ```powershell
@@ -24,6 +29,24 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
   --checkpoint-database <workflow.sqlite3> `
   --output <report.json>
 ```
+
+换 schema HOLDOUT 必须显式创建新 fixture 并选择独立合同；省略 `--dataset-contract` 会继续按原 40 题
+失败关闭：
+
+```powershell
+$env:PYTHONPATH='api/src'
+python -m evals.schema_holdout --output <schema-holdout.sqlite3>
+python -m evals.runner --provider deepseek --evaluation-id <run-id> `
+  --dataset evals/schema_holdout_cases.jsonl `
+  --dataset-contract schema-holdout-v1 `
+  --business-database <schema-holdout.sqlite3> `
+  --checkpoint-database <workflow.sqlite3> `
+  --output <report.json>
+```
+
+HOLDOUT 的 schema、数据、映射题和 gold 必须在真实调用前冻结；首次完整运行无论高低即为最终基线，
+不得据结果调优或补跑。完整停止线见
+[`docs/work/schema-holdout.md`](../docs/work/schema-holdout.md)。
 
 首次固定 20 条 DeepSeek 基线已完成：执行成功率 `7/8`、答案正确率 `14/20`、人工介入率
 `7/20`，20 次调用合计 `19231` tokens，自动重试为 `0`。这是单次冻结合成集结果，不代表生产

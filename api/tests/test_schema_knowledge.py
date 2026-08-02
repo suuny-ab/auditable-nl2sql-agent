@@ -8,6 +8,7 @@ from pathlib import Path
 
 from auditable_nl2sql import (
     SCHEMA_KNOWLEDGE_SCHEMA_VERSION,
+    SCHEMA_HOLDOUT_DATASOURCE_ID,
     DeepSeekSqlGenerator,
     SchemaKnowledgeError,
     build_business_context,
@@ -134,9 +135,11 @@ class SchemaKnowledgeBuilderTests(unittest.TestCase):
         context = build_business_context(
             "非取消订单按销售渠道统计销售额，结果从高到低是什么？",
             self.schema,
+            datasource_id=SCHEMA_HOLDOUT_DATASOURCE_ID,
         )
 
-        self.assertEqual(context["schema_version"], "business-context-v3")
+        self.assertEqual(context["schema_version"], "business-context-v4")
+        self.assertEqual(context["datasource_id"], SCHEMA_HOLDOUT_DATASOURCE_ID)
         self.assertEqual(
             [term["term"] for term in context["matched_terms"]],
             ["销售额", "非取消订单", "订单", "销售渠道"],
@@ -187,7 +190,11 @@ class SchemaKnowledgeBuilderTests(unittest.TestCase):
                 }
 
         transport = RecordingTransport()
-        generator = DeepSeekSqlGenerator(enabled=True, transport=transport)
+        generator = DeepSeekSqlGenerator(
+            enabled=True,
+            transport=transport,
+            datasource_id=SCHEMA_HOLDOUT_DATASOURCE_ID,
+        )
         generator.generate(
             "非取消订单按销售渠道统计销售额，结果从高到低是什么？",
             self.schema,
@@ -207,6 +214,7 @@ class SchemaKnowledgeBuilderTests(unittest.TestCase):
         context = build_business_context(
             "订单 O1001 包含哪些商品、数量、单价和行金额？",
             self.schema,
+            datasource_id=SCHEMA_HOLDOUT_DATASOURCE_ID,
         )
 
         terms = {term["term"] for term in context["matched_terms"]}

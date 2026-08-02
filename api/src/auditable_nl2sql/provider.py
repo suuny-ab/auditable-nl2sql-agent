@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from .intent import INTENT_POLICY_SCHEMA_VERSION, classify_question_intent
-from .knowledge import BusinessKnowledgeError, build_business_context
+from .knowledge import (
+    DEFAULT_DATASOURCE_ID,
+    BusinessKnowledgeError,
+    build_business_context,
+)
 from .schema_summary import SchemaSummaryError, build_schema_summary
 
 
@@ -181,14 +185,18 @@ class DeepSeekSqlGenerator:
         enabled: bool = False,
         transport: DeepSeekTransport | None = None,
         model: str = DEEPSEEK_DEFAULT_MODEL,
+        datasource_id: str = DEFAULT_DATASOURCE_ID,
     ) -> None:
         if type(enabled) is not bool:
             raise ProviderConfigurationError("Provider enabled flag must be a boolean")
         if not isinstance(model, str) or not model.strip():
             raise ProviderConfigurationError("Provider model must be non-empty")
+        if not isinstance(datasource_id, str) or not datasource_id.strip():
+            raise ProviderConfigurationError("Datasource ID must be non-empty")
         self._enabled = enabled
         self._transport = transport
         self._model = model.strip()
+        self._datasource_id = datasource_id.strip()
 
     @classmethod
     def from_environment(
@@ -198,11 +206,16 @@ class DeepSeekSqlGenerator:
         environment: Mapping[str, str] | None = None,
         timeout_seconds: float = 60.0,
         model: str = DEEPSEEK_DEFAULT_MODEL,
+        datasource_id: str = DEFAULT_DATASOURCE_ID,
     ) -> DeepSeekSqlGenerator:
         if type(enabled) is not bool:
             raise ProviderConfigurationError("Provider enabled flag must be a boolean")
         if not enabled:
-            return cls(enabled=False, model=model)
+            return cls(
+                enabled=False,
+                model=model,
+                datasource_id=datasource_id,
+            )
         source = os.environ if environment is None else environment
         api_key = source.get("DEEPSEEK_API_KEY")
         if not api_key:
@@ -214,6 +227,7 @@ class DeepSeekSqlGenerator:
                 timeout_seconds=timeout_seconds,
             ),
             model=model,
+            datasource_id=datasource_id,
         )
 
     def generate(
@@ -301,7 +315,11 @@ class DeepSeekSqlGenerator:
         except SchemaSummaryError as exc:
             raise ProviderConfigurationError("Schema summary is invalid") from exc
         try:
-            business_context = build_business_context(question, schema_snapshot)
+            business_context = build_business_context(
+                question,
+                schema_snapshot,
+                datasource_id=self._datasource_id,
+            )
         except BusinessKnowledgeError as exc:
             raise ProviderConfigurationError("Business knowledge is invalid") from exc
 

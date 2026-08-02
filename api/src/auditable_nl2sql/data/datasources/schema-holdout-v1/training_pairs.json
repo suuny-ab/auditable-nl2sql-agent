@@ -1,0 +1,9 @@
+{
+  "schema_version": "training-pairs-v1",
+  "similarity": {
+    "algorithm": "normalized-character-bigram-jaccard-v1",
+    "threshold": 0.72,
+    "max_matches": 2
+  },
+  "pairs": []
+}

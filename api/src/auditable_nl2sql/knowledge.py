@@ -10,11 +10,11 @@ from functools import lru_cache
 from importlib import resources
 from typing import Any
 
-from .schema_knowledge import SchemaKnowledgeError, build_schema_knowledge
-
-
-BUSINESS_CONTEXT_SCHEMA_VERSION = "business-context-v3"
+BUSINESS_CONTEXT_SCHEMA_VERSION = "business-context-v4"
 BUSINESS_TERMS_SCHEMA_VERSION = "business-terms-v1"
+DATASOURCE_GOVERNANCE_SCHEMA_VERSION = "datasource-governance-v1"
+DEFAULT_DATASOURCE_ID = "synthetic-ecommerce-v1"
+SCHEMA_HOLDOUT_DATASOURCE_ID = "schema-holdout-v1"
 ENUM_VALUES_SCHEMA_VERSION = "enum-values-v1"
 FIELD_DESCRIPTIONS_SCHEMA_VERSION = "field-descriptions-v1"
 TRAINING_PAIRS_SCHEMA_VERSION = "training-pairs-v1"
@@ -30,6 +30,14 @@ _TRAINING_PAIR_KEYS = {"source_case_id", "question", "sql", "enabled"}
 _ENUM_TABLE_KEYS = {"name", "fields"}
 _ENUM_FIELD_KEYS = {"name", "values"}
 _ENUM_VALUE_KEYS = {"value", "aliases"}
+_MANIFEST_KEYS = {
+    "schema_version",
+    "datasource_id",
+    "knowledge_source",
+    "schema_fields",
+}
+_DATASOURCE_ID_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+_KNOWLEDGE_SOURCES = {"curated", "schema-derived"}
 
 
 class BusinessKnowledgeError(ValueError):
@@ -78,6 +86,9 @@ class TrainingPair:
 
 @dataclass(frozen=True)
 class BusinessKnowledge:
+    datasource_id: str
+    knowledge_source: str
+    schema_fields: tuple[str, ...]
     terms: tuple[BusinessTerm, ...]
     field_descriptions: tuple[FieldDescription, ...]
     enum_tables: tuple[str, ...]
@@ -89,15 +100,37 @@ def _reject_json_constant(value: str) -> None:
     raise ValueError(f"non-standard JSON constant is not allowed: {value}")
 
 
-def _read_resource(name: str) -> Mapping[str, Any]:
-    resource = resources.files("auditable_nl2sql").joinpath("data").joinpath(name)
+def _normalize_datasource_id(datasource_id: str) -> str:
+    if (
+        not isinstance(datasource_id, str)
+        or _DATASOURCE_ID_PATTERN.fullmatch(datasource_id) is None
+    ):
+        raise BusinessKnowledgeError("Datasource ID is invalid")
+    return datasource_id
+
+
+def _read_resource(
+    name: str,
+    *,
+    datasource_id: str = DEFAULT_DATASOURCE_ID,
+) -> Mapping[str, Any]:
+    normalized_id = _normalize_datasource_id(datasource_id)
+    resource = (
+        resources.files("auditable_nl2sql")
+        .joinpath("data")
+        .joinpath("datasources")
+        .joinpath(normalized_id)
+        .joinpath(name)
+    )
     try:
         payload = json.loads(
             resource.read_text(encoding="utf-8"),
             parse_constant=_reject_json_constant,
         )
     except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise BusinessKnowledgeError(f"Could not load packaged knowledge: {name}") from exc
+        raise BusinessKnowledgeError(
+            f"Could not load packaged knowledge for datasource: {normalized_id}/{name}"
+        ) from exc
     except ValueError as exc:
         raise BusinessKnowledgeError(f"Knowledge is not strict JSON: {name}") from exc
     if not isinstance(payload, Mapping):
@@ -126,20 +159,48 @@ def _require_text_list(value: object, label: str) -> tuple[str, ...]:
     return items
 
 
-@lru_cache(maxsize=1)
-def load_business_knowledge() -> BusinessKnowledge:
-    """Load and strictly validate the immutable packaged knowledge files."""
+@lru_cache(maxsize=8)
+def load_business_knowledge(
+    datasource_id: str = DEFAULT_DATASOURCE_ID,
+) -> BusinessKnowledge:
+    """Load one strictly validated, immutable datasource knowledge namespace."""
+
+    normalized_id = _normalize_datasource_id(datasource_id)
+    manifest = _require_keys(
+        _read_resource("manifest.json", datasource_id=normalized_id),
+        _MANIFEST_KEYS,
+        "datasource manifest",
+    )
+    if manifest["schema_version"] != DATASOURCE_GOVERNANCE_SCHEMA_VERSION:
+        raise BusinessKnowledgeError("Unsupported datasource manifest schema version")
+    if manifest["datasource_id"] != normalized_id:
+        raise BusinessKnowledgeError("Datasource manifest ID does not match namespace")
+    knowledge_source = manifest["knowledge_source"]
+    if knowledge_source not in _KNOWLEDGE_SOURCES:
+        raise BusinessKnowledgeError("Datasource knowledge source is invalid")
+    schema_fields = _require_text_list(
+        manifest["schema_fields"],
+        "datasource schema fields",
+    )
+    if tuple(sorted(schema_fields)) != schema_fields or any(
+        re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*", reference)
+        is None
+        for reference in schema_fields
+    ):
+        raise BusinessKnowledgeError(
+            "Datasource schema fields must be sorted table.field references"
+        )
 
     term_payload = _require_keys(
-        _read_resource("business_terms.json"),
+        _read_resource("business_terms.json", datasource_id=normalized_id),
         {"schema_version", "terms"},
         "business terms root",
     )
     if term_payload["schema_version"] != BUSINESS_TERMS_SCHEMA_VERSION:
         raise BusinessKnowledgeError("Unsupported business terms schema version")
     raw_terms = term_payload["terms"]
-    if not isinstance(raw_terms, list) or len(raw_terms) != 10:
-        raise BusinessKnowledgeError("Business terms must contain exactly 10 entries")
+    if not isinstance(raw_terms, list) or not raw_terms:
+        raise BusinessKnowledgeError("Business terms must contain entries")
 
     terms: list[BusinessTerm] = []
     aliases: set[str] = set()
@@ -173,7 +234,7 @@ def load_business_knowledge() -> BusinessKnowledge:
         )
 
     field_payload = _require_keys(
-        _read_resource("field_descriptions.json"),
+        _read_resource("field_descriptions.json", datasource_id=normalized_id),
         {"schema_version", "tables"},
         "field descriptions root",
     )
@@ -237,9 +298,13 @@ def load_business_knowledge() -> BusinessKnowledge:
         raise BusinessKnowledgeError(
             f"Business terms reference unknown fields: {unknown_references}"
         )
+    if set(schema_fields) != field_references:
+        raise BusinessKnowledgeError(
+            "Datasource manifest fields must match field descriptions"
+        )
 
     enum_payload = _require_keys(
-        _read_resource("enum_values.json"),
+        _read_resource("enum_values.json", datasource_id=normalized_id),
         {"schema_version", "tables"},
         "enum values root",
     )
@@ -334,7 +399,7 @@ def load_business_knowledge() -> BusinessKnowledge:
         )
 
     training_payload = _require_keys(
-        _read_resource("training_pairs.json"),
+        _read_resource("training_pairs.json", datasource_id=normalized_id),
         {"schema_version", "similarity", "pairs"},
         "training pairs root",
     )
@@ -352,8 +417,8 @@ def load_business_knowledge() -> BusinessKnowledge:
     }:
         raise BusinessKnowledgeError("Training pair similarity contract changed")
     raw_pairs = training_payload["pairs"]
-    if not isinstance(raw_pairs, list) or len(raw_pairs) != 16:
-        raise BusinessKnowledgeError("Training pairs must contain exactly 16 entries")
+    if not isinstance(raw_pairs, list):
+        raise BusinessKnowledgeError("Training pairs must be a list")
 
     training_pairs: list[TrainingPair] = []
     source_case_ids: set[str] = set()
@@ -396,9 +461,10 @@ def load_business_knowledge() -> BusinessKnowledge:
                 enabled=enabled,
             )
         )
-    if source_case_ids != {f"success-{index:03d}" for index in range(1, 17)}:
-        raise BusinessKnowledgeError("Training pairs must cover success-001 through 016")
     return BusinessKnowledge(
+        datasource_id=normalized_id,
+        knowledge_source=knowledge_source,
+        schema_fields=schema_fields,
         terms=tuple(terms),
         field_descriptions=tuple(descriptions),
         enum_tables=tuple(enum_tables),
@@ -462,12 +528,13 @@ def _enum_alias_matches(alias: str, normalized_question: str) -> bool:
 def retrieve_training_examples(
     question: str,
     *,
+    datasource_id: str = DEFAULT_DATASOURCE_ID,
     training_pairs: tuple[TrainingPair, ...] | None = None,
 ) -> list[dict[str, Any]]:
     """Return a stable, bounded list of enabled similar training pairs."""
 
     pairs = (
-        load_business_knowledge().training_pairs
+        load_business_knowledge(datasource_id).training_pairs
         if training_pairs is None
         else training_pairs
     )
@@ -499,28 +566,20 @@ def retrieve_training_examples(
 def build_business_context(
     question: str,
     schema_snapshot: list[dict[str, Any]],
+    *,
+    datasource_id: str = DEFAULT_DATASOURCE_ID,
 ) -> dict[str, Any]:
-    """Return only question-matched terms and their available field notes."""
+    """Return matched context from exactly one datasource knowledge namespace."""
 
     normalized_question = _require_text(question, "question").casefold()
-    knowledge = load_business_knowledge()
+    knowledge = load_business_knowledge(datasource_id)
     available_fields = _available_field_references(schema_snapshot)
-    packaged_field_references = {
-        description.reference for description in knowledge.field_descriptions
-    }
-    use_packaged_knowledge = available_fields <= packaged_field_references
-    if use_packaged_knowledge:
-        terms = knowledge.terms
-        descriptions = knowledge.field_descriptions
-    else:
-        try:
-            derived = build_schema_knowledge(schema_snapshot)
-        except SchemaKnowledgeError as exc:
-            raise BusinessKnowledgeError(
-                "Schema-derived business knowledge is invalid"
-            ) from exc
-        terms = derived.candidate_terms
-        descriptions = derived.field_descriptions
+    if not available_fields <= set(knowledge.schema_fields):
+        raise BusinessKnowledgeError(
+            "Schema does not belong to the selected datasource namespace"
+        )
+    terms = knowledge.terms
+    descriptions = knowledge.field_descriptions
     matched_terms: list[dict[str, Any]] = []
     related_fields: set[str] = set()
 
@@ -581,15 +640,15 @@ def build_business_context(
 
     return {
         "schema_version": BUSINESS_CONTEXT_SCHEMA_VERSION,
+        "datasource_id": knowledge.datasource_id,
         "matched_terms": matched_terms,
         "field_notes": field_notes,
         "enum_values": enum_matches[:ENUM_VALUE_MAX_MATCHES],
         "training_examples": (
             retrieve_training_examples(
                 question,
+                datasource_id=knowledge.datasource_id,
                 training_pairs=knowledge.training_pairs,
             )
-            if use_packaged_knowledge
-            else []
         ),
     }

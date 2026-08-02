@@ -8,9 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from auditable_nl2sql import (
+    DEFAULT_DATASOURCE_ID,
     DeepSeekSqlGenerator,
     ProviderConfigurationError,
     SCHEMA_SUMMARY_SCHEMA_VERSION,
+    SCHEMA_HOLDOUT_DATASOURCE_ID,
     SchemaSummaryError,
     build_schema_summary,
     read_schema,
@@ -195,13 +197,21 @@ class SchemaSummaryTests(unittest.TestCase):
                     build_schema_summary(schema)
 
     def test_provider_injects_summary_for_both_schemas_and_keeps_raw_authority(self) -> None:
-        for name, schema in (
-            ("main", self.main_schema),
-            ("alternate", self.alternate_schema),
+        for name, schema, datasource_id in (
+            ("main", self.main_schema, DEFAULT_DATASOURCE_ID),
+            (
+                "alternate",
+                self.alternate_schema,
+                SCHEMA_HOLDOUT_DATASOURCE_ID,
+            ),
         ):
             with self.subTest(name=name):
                 transport = RecordingTransport()
-                generator = DeepSeekSqlGenerator(enabled=True, transport=transport)
+                generator = DeepSeekSqlGenerator(
+                    enabled=True,
+                    transport=transport,
+                    datasource_id=datasource_id,
+                )
                 generator.generate("列出全部订单。", schema)
 
                 self.assertEqual(len(transport.calls), 1)

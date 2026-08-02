@@ -124,26 +124,44 @@ const generalizationDimensions = [
     pr: "25",
   },
   {
-    score: "8/15",
+    score: "最新 9/15",
     label: "换 schema",
-    detail: "第二套合成库的总正确率；结构摘要轮次没有提分。",
-    boundary: "成功题仍为 0/7",
-    report: "schema-summary-injection.md",
-    pr: "30",
+    detail:
+      "结构摘要历史轮次 8/15；原生注释使 8/15 → 9/15；有限字段值采集保持 9/15。",
+    boundary: "成功题 0/7 → 1/7；同一换库集合复测",
+    evidence: [
+      { label: "结构摘要", report: "schema-summary-injection.md", pr: "30" },
+      { label: "原生注释", report: "native-metadata.md", pr: "34" },
+      {
+        label: "有限字段值",
+        report: "low-cardinality-value-collection.md",
+        pr: "35",
+      },
+    ],
   },
   {
     score: "投影 27/30",
     label: "同义改述",
     detail: "旧完整基线 24/30，加上掉分三题的定向结果。",
     boundary: "仅复跑 3 条，不是完整 30 题新轮次",
-    report: "paraphrase-synonym-coverage.md",
-    pr: "29",
+    evidence: [
+      { report: "paraphrase-synonym-coverage.md", pr: "29" },
+    ],
   },
 ];
 
-function EvidencePair({ report, pr }: { report: string; pr: string }) {
+function EvidencePair({
+  report,
+  pr,
+  label,
+}: {
+  report: string;
+  pr: string;
+  label?: string;
+}) {
   return (
     <span className="metric-links">
+      {label ? <small>{label}</small> : null}
       <a
         href={`${repoBase}/blob/main/docs/work/${report}`}
         target="_blank"
@@ -155,6 +173,25 @@ function EvidencePair({ report, pr }: { report: string; pr: string }) {
         PR #{pr} ↗
       </a>
     </span>
+  );
+}
+
+function EvidenceList({
+  evidence,
+}: {
+  evidence: Array<{ report: string; pr: string; label?: string }>;
+}) {
+  return (
+    <div className="evidence-list">
+      {evidence.map((item) => (
+        <EvidencePair
+          key={`${item.report}-${item.pr}`}
+          report={item.report}
+          pr={item.pr}
+          label={item.label}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -307,7 +344,13 @@ export default function Home() {
               <strong>{dimension.score}</strong>
               <span>{dimension.detail}</span>
               <b>{dimension.boundary}</b>
-              <EvidencePair report={dimension.report} pr={dimension.pr} />
+              <EvidenceList
+                evidence={
+                  "evidence" in dimension
+                    ? dimension.evidence
+                    : [{ report: dimension.report, pr: dimension.pr }]
+                }
+              />
             </article>
           ))}
         </div>
@@ -315,22 +358,32 @@ export default function Home() {
         <div className="shortfall-panel">
           <div className="shortfall-finding">
             <p className="section-number">EXPOSED SHORTFALL</p>
-            <strong>0/7</strong>
-            <h3>结构可见 ≠ 值语义可用</h3>
+            <strong>1/7</strong>
+            <h3>元数据和值可见 ≠ 业务合同完整</h3>
             <p>
-              换 schema 的成功题仍为 0/7。紧凑结构摘要没有提分；未知枚举值、金额单位、输出别名与
-              审批阈值合同仍会让系统保守终止或答非所问。
+              原生注释让成功题从 0/7 → 1/7；有限字段值采集未新增提升。剩余成功题 6/7 的已知缺口
+              集中在金额单位、输出列 / 行合同与有界查询 / 审批合同。
             </p>
-            <EvidencePair report="schema-summary-injection.md" pr="30" />
+            <EvidenceList
+              evidence={[
+                { label: "结构摘要", report: "schema-summary-injection.md", pr: "30" },
+                { label: "原生注释", report: "native-metadata.md", pr: "34" },
+                {
+                  label: "有限字段值",
+                  report: "low-cardinality-value-collection.md",
+                  pr: "35",
+                },
+              ]}
+            />
           </div>
           <div className="route-list">
-            <p className="route-label">候选假设 · 未实现</p>
+            <p className="route-label">已实现改道 · 结果分层</p>
             <ol>
-              <li>为陌生 schema 引入有界、版本化的值语义，而不是猜枚举。</li>
-              <li>把金额单位、输出别名与 limit / 审批阈值写成可机检合同。</li>
-              <li>在第三套未触碰合成 schema 上验证，再决定是否保留改道。</li>
+              <li>SQLite 原生注释已接入：总正确 8/15 → 9/15，成功题 0/7 → 1/7。</li>
+              <li>5 个低基数字段的 17 个值已接入：9/15、1/7 持平，没有新增提升。</li>
+              <li>剩余 6/7 需要新的产品切片处理业务合同，本次事实同步不继续调优。</li>
             </ol>
-            <small>这些是下一轮验证方向，不是当前能力，也不是已排期承诺。</small>
+            <small>三轮来自同一换库集合的开发复测，不是新的 unseen 证据或生产可靠性证明。</small>
           </div>
         </div>
       </section>
@@ -477,7 +530,7 @@ export default function Home() {
 
       <footer>
         <span>Auditable NL2SQL Agent</span>
-        <span>v2 本地候选 · 尚未部署 · 2026</span>
+        <span>v2 公开事实已同步 · 尚未部署 · 2026</span>
       </footer>
     </main>
   );

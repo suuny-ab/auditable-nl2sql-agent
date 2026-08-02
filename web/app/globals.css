@@ -550,6 +550,22 @@ nav a:hover::after {
   color: var(--ink);
 }
 
+.metric-links small {
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-weight: 760;
+}
+
+.evidence-list {
+  display: grid;
+  gap: 9px;
+  margin-top: auto;
+}
+
+.evidence-list .metric-links {
+  margin-top: 0;
+}
+
 .generalization-heading {
   display: grid;
   grid-template-columns: 0.42fr 1fr;
@@ -670,6 +686,10 @@ nav a:hover::after {
 
 .shortfall-panel .metric-links a {
   color: var(--lime);
+}
+
+.shortfall-panel .metric-links small {
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .route-label {

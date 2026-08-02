@@ -66,6 +66,8 @@ test("renders the validation arc with evidence and honest generalization boundar
     ["unseen-success-fix.md", "23"],
     ["hardcase-fix.md", "25"],
     ["schema-summary-injection.md", "30"],
+    ["native-metadata.md", "34"],
+    ["low-cardinality-value-collection.md", "35"],
     ["paraphrase-synonym-coverage.md", "29"],
   ];
   for (const [report, pr] of evidencePaths) {
@@ -81,10 +83,14 @@ test("renders the validation arc with evidence and honest generalization boundar
 
   assert.match(html, /同一 20 题开发集/);
   assert.match(html, /已见开发集满分 ≠ 未见泛化/);
-  assert.match(html, /成功题仍为 0\/7/);
+  assert.match(html, /结构摘要历史轮次 8\/15/);
+  assert.match(html, /原生注释.*8\/15 → 9\/15/);
+  assert.match(html, /成功题.*0\/7 → 1\/7/);
+  assert.match(html, /有限字段值采集未新增提升/);
+  assert.match(html, /剩余成功题 6\/7/);
   assert.match(html, /投影 27\/30/);
   assert.match(html, /仅复跑 3 条/);
-  assert.match(html, /候选假设 · 未实现/);
+  assert.doesNotMatch(html, /换 schema 的成功题仍为 0\/7|候选假设 · 未实现/);
 });
 
 test("removes starter artifacts and keeps local scripts cross-platform", async () => {

@@ -4,16 +4,16 @@
 
 | 字段 | 内容 |
 | --- | --- |
-| `state` | `ready-local` |
+| `state` | `in-review` |
 | 更新时间 | `2026-08-02` |
-| 当前切片 | `READONLY-API-HEALTH-015`：独立启动装配与版本化只读 health 已在本地完成 |
-| 最近完成 | `FASTAPI-READONLY-QUERY-014`：PR #10 已 squash 合并，主分支 CI 通过 |
-| 做什么 | 用 Uvicorn 独立启动现有只读 API，提供 `GET /api/v1/health`，lifespan 管理 reader |
-| 不做什么 | 不创建或审批 run，不调 Provider，不做鉴权、网页、Docker、部署或公开发布 |
-| 完成门 | 已满足：真实 HTTP 启动、health、只读复用、缺失库失败关闭、双库哈希不变、53 项回归通过 |
-| 风险 | 默认只监听 `127.0.0.1`；当前没有身份权限边界，不应直接暴露到不可信网络 |
-| 项目基线 | `main@c1beba48`：PR #10 已 squash 合并；main CI run `30737546034` 成功 |
-| 阻碍 | 无工程阻碍；health 本地分支尚未获得新的 push/PR 授权，也没有远端 CI 证据 |
+| 当前切片 | `DOCKER-COMPOSE-READONLY-API-016`：Docker/Compose 本地闭环完成，远端发布验证进行中 |
+| 最近完成 | `READONLY-API-HEALTH-015`：PR #11 已 squash 合并，主分支 CI 通过 |
+| 做什么 | 固定依赖构建非 root 只读镜像，用 Compose 启动 health 与固定合成 run 回查 |
+| 不做什么 | 不部署服务器，不调 Provider，不做鉴权、网页、Caddy/TLS、GHCR 或真实数据 |
+| 完成门 | 本地已满足：镜像/Compose、health/run、双库哈希不变、只读安全姿态、55 项回归通过 |
+| 风险 | 当前只有本地容器证据；没有 TLS、鉴权、持久化写卷或服务器运行证明，不可称为已上线 |
+| 项目基线 | `main@2ce3c1c6`：PR #11 已 squash 合并；main CI run `30738237711` 成功 |
+| 阻碍 | 无；远端分支已按本单授权发布，待 Draft PR 的 Python/container 双 CI 与 squash 合并 |
 
 ## 复用审查
 
@@ -38,6 +38,36 @@
 - 首次公开推送 SHA `429b44007e7848317fcccd3199a168ff97fc8075`；GitHub Actions
   [run 30628166219](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30628166219)
   在该 SHA 上完成，结论为 `success`。
+
+## DOCKER-COMPOSE-READONLY-API-016 验证证据
+
+- 已读取本单，SHA-256 为
+  `15a94f692fc7686491bc0bf2b3dcc3bc75e2b460237a44448c5273a272661395`；范围固定为本地
+  Docker/Compose，不部署、不启用 Provider、不改产品代码。
+- Docker `29.5.3` / Compose `5.1.4` 在 Linux/x86_64 daemon 上从固定 Python 3.13 digest 与
+  hash lock 构建镜像 `sha256:8f42a490…f0613b`（`188522799` bytes）。
+- `docker compose up --build --detach --wait` 成功；health 精确返回
+  `health-v1 / 0.1.0.dev0 / ok / read_only=true`，list 总数为 `1`，
+  `container-demo-run` 返回 `completed / run-record-v5`，POST 返回 `405`。
+- 运行身份为 `10001:10001`，两份临时 SQLite 为 `0444:10001:10001`；根文件系统写入返回
+  `Read-only file system`，Compose 实测 `read_only=true`、`cap_drop=ALL`、
+  `no-new-privileges`、临时 `/tmp`，端口只绑定 `127.0.0.1:8000`。
+- 初次直接从只读镜像路径打开 WAL checkpoint 复现 `sqlite3.OperationalError: unable to open
+  database file`；隔离验证后由容器入口复制到 tmpfs 并设 `0444`，产品 reader 继续使用
+  `mode=ro + query_only`。最终 health/list/detail/拒绝请求前后双库 SHA-256 完全不变。
+- Python `3.13.12` 新增容器合同 2 项、全量 55 项测试通过；`compileall`、`pip check`、
+  `docker compose config`、`git diff --check` 通过。`api/src` 差异、产品反向导入、容器凭据模式、
+  `.local` 跟踪文件均为 `0`。
+- CI 新增独立 `container` job，只构建和运行 Compose、验证相同合同并停止容器；不发布镜像、不
+  部署、不读取凭据。本地绿色不等于远端 CI，远端证据须在 Draft PR 后补记。
+- 实现提交为 `1316421ce457e7718c508c2b2423489869f67b6c`，基于
+  `origin/main@2ce3c1c67e70e10b55d69d29f7346f146c6087bd`。首次 HTTPS 推送曾因 token 缺少
+  `workflow` scope 被 GitHub 拒绝；用户补齐 scope 后，`gh auth status` 与 `gh api user` 确认
+  `suuny-ab` 登录有效，远端 `agent/docker-compose-readonly-api` 已与本地恢复回执 head
+  `8d13775e2b5f94e32440c50f4bf7b4ea688a06e2` 对齐。后续事实以 Draft PR 精确 head 为准。
+- 本轮 Provider 调用、凭据读取、token 消耗、费用、服务器写入和公开部署均为 `0`。完整合同与
+  Traceable 复用审查见
+  [`docs/work/docker-compose-readonly-api.md`](work/docker-compose-readonly-api.md)。
 - [PR #1](https://github.com/suuny-ab/auditable-nl2sql-agent/pull/1) 已合并为 `63381f9`；
   [main CI run 30684609206](https://github.com/suuny-ab/auditable-nl2sql-agent/actions/runs/30684609206)
   在该 SHA 上完成，结论为 `success`。
@@ -245,9 +275,10 @@
 
 ## 当前检查点
 
-只读 API 查询核心已由 PR #10 合入 `main`，独立启动与 health 切片已在本地分支完成；保留首次
-真实 20 条基线的 `7/8`、`14/20`、`7/20`，不做 prompt 调优或补跑。下一步仅在获得新的
-push/PR 授权后发布 health 分支并取得远端 CI；鉴权、网页、Docker 与部署不自动开工。
+只读 API 查询与独立启动/health 已分别由 PR #10、PR #11 合入 `main`；Docker/Compose 切片已
+完成本地实测，待按本单授权发布、取得 Python 与 container 两个远端 CI job 后 squash 合并。
+保留首次真实 20 条基线的 `7/8`、`14/20`、`7/20`，不做 prompt 调优或补跑；服务器部署、
+Caddy/TLS、鉴权与网页不自动开工。
 
 ## 审批中断/恢复最小风险探针
 

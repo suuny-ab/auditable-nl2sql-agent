@@ -11,7 +11,8 @@
 
 首次 20 条固定模型基线为执行成功率 `7/8`、答案正确率 `14/20`、人工介入率 `7/20`；它只代表
 冻结合成集上的单次结果，不构成生产稳定性主张。FastAPI 只读服务已提供 health、任务摘要列表和
-完整 run/trajectory 回查；网页和 Docker 仍待实现。当前回答是确定性结果投影，
+完整 run/trajectory 回查，并可由 Docker Compose 启动固定合成演示；网页仍待实现。当前回答是
+确定性结果投影，
 不是 LLM 自由回答；SHA-256 用于稳定绑定和变化检测，不是数字签名，也不证明 SQL 或答案的业务
 语义正确。
 
@@ -22,7 +23,7 @@ api/       Python 产品代码与测试
 docs/      当前状态和有界切片合同
 evals/     20 条固定合成评测合同与机器校验
 web/       最小任务/轨迹页面（待实现）
-deploy/    Docker 一键启动（待实现）
+deploy/    Docker 构建、固定合成 fixture 与部署边界说明
 ```
 
 ## 本地验证
@@ -54,6 +55,32 @@ $env:PYTHONPATH = "api/src"
 安装项目后也可使用等价入口 `auditable-nl2sql-api`。启动成功后，
 `GET http://127.0.0.1:8000/api/v1/health` 返回服务版本和 `read_only=true`；服务不提供 run 创建或
 审批接口。
+
+## 从克隆到 Docker 启动
+
+下面是一条完整的本地 PowerShell 命令链。镜像构建期只生成固定合成电商数据库和一个已完成的
+`container-demo-run`；运行容器不读取本机数据库、Provider 凭据或真实数据。
+
+```powershell
+git clone https://github.com/suuny-ab/auditable-nl2sql-agent.git
+Set-Location auditable-nl2sql-agent
+docker compose up --build --detach --wait
+curl.exe --fail --silent --show-error http://127.0.0.1:8000/api/v1/health
+curl.exe --fail --silent --show-error http://127.0.0.1:8000/api/v1/runs/container-demo-run
+docker compose logs api
+docker compose down
+```
+
+服务默认只绑定 `127.0.0.1:8000`。端口被占用时，可在启动前执行
+`$env:AUDITABLE_NL2SQL_API_PORT = "18000"`。Compose 运行 API 时使用 UID/GID `10001:10001`、
+只读根文件系统、移除全部 Linux capabilities，并把 `/tmp` 设为临时文件系统。这是本地容器化
+证据，不是服务器部署、TLS、鉴权或生产可用声明。
+
+只构建镜像而不启动 Compose 时使用：
+
+```powershell
+docker build --file deploy/Dockerfile --build-arg VCS_REF=local --tag auditable-nl2sql-api:local .
+```
 
 当前事实与下一步见 [`docs/status.md`](docs/status.md)。
 

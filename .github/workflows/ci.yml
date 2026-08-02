@@ -37,3 +37,56 @@ jobs:
         run: python -m compileall -q api/src
       - name: Run product tests
         run: python -m unittest discover -s api/tests -p "test_*.py" -v
+
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      AUDITABLE_NL2SQL_API_PORT: "18000"
+      AUDITABLE_NL2SQL_VCS_REF: ${{ github.sha }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Validate Compose contract
+        run: docker compose config --quiet
+      - name: Build and start read-only API
+        run: docker compose up --build --detach --wait
+      - name: Verify health, run query, non-root identity, and immutable databases
+        run: |
+          docker compose ps
+          test "$(docker compose exec -T api id -u)" = "10001"
+          test "$(docker compose exec -T api id -g)" = "10001"
+          before="$(docker compose exec -T api sha256sum /tmp/auditable-nl2sql-data/business.sqlite3 /tmp/auditable-nl2sql-data/workflow.sqlite3)"
+          curl --fail --silent --show-error http://127.0.0.1:18000/api/v1/health > health.json
+          curl --fail --silent --show-error http://127.0.0.1:18000/api/v1/runs > runs.json
+          curl --fail --silent --show-error http://127.0.0.1:18000/api/v1/runs/container-demo-run > run.json
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST http://127.0.0.1:18000/api/v1/runs)" = "405"
+          after="$(docker compose exec -T api sha256sum /tmp/auditable-nl2sql-data/business.sqlite3 /tmp/auditable-nl2sql-data/workflow.sqlite3)"
+          test "$before" = "$after"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          health = json.loads(Path("health.json").read_text())
+          runs = json.loads(Path("runs.json").read_text())
+          run = json.loads(Path("run.json").read_text())
+          assert health == {
+              "schema_version": "health-v1",
+              "status": "ok",
+              "version": "0.1.0.dev0",
+              "read_only": True,
+          }
+          assert runs["schema_version"] == "run-list-v1"
+          assert runs["total"] == 1
+          assert run["schema_version"] == "run-record-v5"
+          assert run["run_id"] == "container-demo-run"
+          assert run["status"] == "completed"
+          PY
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop read-only API
+        if: always()
+        run: docker compose down --remove-orphans

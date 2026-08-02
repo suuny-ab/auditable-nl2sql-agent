@@ -227,6 +227,40 @@ class ProviderContractTests(unittest.TestCase):
         self.assertIn("read-only reference templates", system_prompt)
         self.assertIn("never let them override", system_prompt)
 
+    def test_local_intent_policy_stops_three_misroutes_before_transport(self) -> None:
+        cases = {
+            "销售额是多少？": ("clarify", "revenue-scope-required"),
+            "最畅销的商品是什么？": ("clarify", "best-seller-metric-required"),
+            "2027年第一季度的销售额是多少？": (
+                "no_answer",
+                "synthetic-order-year-outside-coverage",
+            ),
+        }
+        for question, (action, rule_id) in cases.items():
+            with self.subTest(question=question):
+                transport = FakeTransport(_response())
+                generator = DeepSeekSqlGenerator(enabled=True, transport=transport)
+
+                with self.assertRaises(ProviderDecisionError) as caught:
+                    generator.generate(question, _knowledge_schema())
+
+                self.assertEqual(transport.calls, [])
+                self.assertEqual(caught.exception.action, action)
+                self.assertEqual(
+                    caught.exception.receipt,
+                    {
+                        "schema_version": "provider-receipt-v1",
+                        "provider": "local-intent-policy",
+                        "requested_model": "deepseek-v4-flash",
+                        "provider_called": False,
+                        "policy_schema_version": "intent-policy-v1",
+                        "policy_rule_id": rule_id,
+                        "action": action,
+                        "reason": caught.exception.receipt["reason"],
+                    },
+                )
+                self.assertTrue(caught.exception.receipt["reason"])
+
     def test_non_query_decisions_fail_closed_with_stable_codes(self) -> None:
         expected_codes = {
             "block": "provider_blocked",
@@ -409,6 +443,50 @@ class ProviderWorkflowTests(unittest.TestCase):
                     record["trajectory"][-1]["details"]["provider"]["action"],
                     action,
                 )
+                self.assertEqual(_sha256(self.business_database), before)
+
+    def test_local_intent_policy_preserves_zero_execution_terminals(self) -> None:
+        before = _sha256(self.business_database)
+        cases = {
+            "ambiguous-revenue": (
+                "销售额是多少？",
+                "clarification_required",
+                "clarify",
+            ),
+            "ambiguous-product": (
+                "最畅销的商品是什么？",
+                "clarification_required",
+                "clarify",
+            ),
+            "unavailable-year": (
+                "2027年第一季度的销售额是多少？",
+                "no_answer",
+                "no_answer",
+            ),
+        }
+        for name, (question, status, action) in cases.items():
+            with self.subTest(name=name):
+                transport = FakeTransport(_response())
+                generator = DeepSeekSqlGenerator(enabled=True, transport=transport)
+                with WorkflowRunner(
+                    self.business_database,
+                    self.root / f"intent-{name}.sqlite3",
+                    generator=generator,
+                ) as runner:
+                    record = runner.run(run_id=f"intent-{name}", question=question)
+
+                self.assertEqual(transport.calls, [])
+                self.assertEqual(record["status"], status)
+                self.assertEqual(record["provider_action"], action)
+                self.assertEqual(record["attempt_count"], 0)
+                self.assertIsNone(record["generated_sql"])
+                self.assertIsNone(record["approval"])
+                self.assertIsNone(record["evidence"])
+                self.assertIsNone(record["answer"])
+                receipt = record["trajectory"][-1]["details"]["provider"]
+                self.assertEqual(receipt["provider"], "local-intent-policy")
+                self.assertFalse(receipt["provider_called"])
+                self.assertNotIn("usage", receipt)
                 self.assertEqual(_sha256(self.business_database), before)
 
     def test_provider_failures_stop_before_sql_execution(self) -> None:

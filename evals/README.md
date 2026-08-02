@@ -20,6 +20,11 @@
 来源题逐字相同，reference SQL 只按新 schema 重写；合同固定 `7/2/2/2/2` 类别和来源 ID。它不进入
 训练对，也不替换原 40 题合同。
 
+`paraphrase_cases.json` 是独立的同义改述考场：从主库 40 题中按五类各选 2 题，每题保存
+`formal / colloquial / restructured` 三种自然问法，共 30 条。文件显式声明含义不变并映射来源题；
+`paraphrase.py` 把来源题的类别、reference SQL 和 expected 原样投影到改述题，严格拒绝来源漂移，
+同时把每条结果与封存的原题判定比较为稳定、掉分或改善。它不修改主 40 题、知识层或训练对。
+
 真实 DeepSeek 运行命令形状如下；数据库、checkpoint 和报告应放在 Git 忽略的 `.local/`：
 
 ```powershell
@@ -47,6 +52,17 @@ python -m evals.runner --provider deepseek --evaluation-id <run-id> `
 HOLDOUT 的 schema、数据、映射题和 gold 必须在真实调用前冻结；首次完整运行无论高低即为最终基线，
 不得据结果调优或补跑。完整停止线见
 [`docs/work/schema-holdout.md`](../docs/work/schema-holdout.md)。
+
+同义改述评测也必须显式选择独立合同；30 个变体最多各进入 Provider 一次，运行器自动重试仍为 `0`：
+
+```powershell
+$env:PYTHONPATH='api/src'
+python -m evals.runner --provider deepseek --evaluation-id <run-id> `
+  --dataset evals/paraphrase_cases.json --dataset-contract paraphrase-v1 `
+  --business-database <business.sqlite3> `
+  --checkpoint-database <workflow.sqlite3> `
+  --output <report.json>
+```
 
 首次固定 20 条 DeepSeek 基线已完成：执行成功率 `7/8`、答案正确率 `14/20`、人工介入率
 `7/20`，20 次调用合计 `19231` tokens，自动重试为 `0`。这是单次冻结合成集结果，不代表生产

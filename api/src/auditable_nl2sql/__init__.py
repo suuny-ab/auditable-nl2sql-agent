@@ -99,6 +99,22 @@ from .workflow import (
     WorkflowRunReader,
     WorkflowRunner,
 )
+from .value_collection import (
+    DEFAULT_MAX_CANDIDATE_FIELDS,
+    DEFAULT_MAX_DISTINCT_VALUES,
+    DEFAULT_MAX_VALUE_CHARS,
+    DEFAULT_VALUE_COLLECTION_TIMEOUT_SECONDS,
+    MAX_CANDIDATE_FIELDS_LIMIT,
+    MAX_DISTINCT_VALUES_LIMIT,
+    MAX_VALUE_CHARS_LIMIT,
+    MAX_VALUE_COLLECTION_TIMEOUT_SECONDS,
+    VALUE_COLLECTION_SCHEMA_VERSION,
+    CollectedEnumField,
+    LowCardinalityValueCollection,
+    ValueCollectionError,
+    build_enum_values_payload,
+    collect_low_cardinality_values,
+)
 
 __all__ = [
     "ANSWER_SCHEMA_VERSION",
@@ -184,4 +200,18 @@ __all__ = [
     "UnsupportedQuestionError",
     "WorkflowRunReader",
     "WorkflowRunner",
+    "DEFAULT_MAX_CANDIDATE_FIELDS",
+    "DEFAULT_MAX_DISTINCT_VALUES",
+    "DEFAULT_MAX_VALUE_CHARS",
+    "DEFAULT_VALUE_COLLECTION_TIMEOUT_SECONDS",
+    "MAX_CANDIDATE_FIELDS_LIMIT",
+    "MAX_DISTINCT_VALUES_LIMIT",
+    "MAX_VALUE_CHARS_LIMIT",
+    "MAX_VALUE_COLLECTION_TIMEOUT_SECONDS",
+    "VALUE_COLLECTION_SCHEMA_VERSION",
+    "CollectedEnumField",
+    "LowCardinalityValueCollection",
+    "ValueCollectionError",
+    "build_enum_values_payload",
+    "collect_low_cardinality_values",
 ]

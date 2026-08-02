@@ -159,6 +159,15 @@ def _require_text_list(value: object, label: str) -> tuple[str, ...]:
     return items
 
 
+def _require_optional_text_list(value: object, label: str) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        raise BusinessKnowledgeError(f"{label} must be a list")
+    items = tuple(_require_text(item, label) for item in value)
+    if len(set(items)) != len(items):
+        raise BusinessKnowledgeError(f"{label} must not contain duplicates")
+    return items
+
+
 @lru_cache(maxsize=8)
 def load_business_knowledge(
     datasource_id: str = DEFAULT_DATASOURCE_ID,
@@ -316,7 +325,6 @@ def load_business_knowledge(
 
     enum_tables: list[str] = []
     enum_fields: set[str] = set()
-    enum_aliases: set[str] = set()
     enum_values: list[EnumValue] = []
     for table_index, raw_table in enumerate(raw_enum_tables):
         table_data = _require_keys(
@@ -358,6 +366,7 @@ def load_business_knowledge(
                     f"{reference}.values must be a non-empty list"
                 )
             field_values: set[str] = set()
+            field_aliases: set[str] = set()
             for value_index, raw_value in enumerate(raw_values):
                 value_data = _require_keys(
                     raw_value,
@@ -374,17 +383,17 @@ def load_business_knowledge(
                         f"Duplicate enum value for {reference}: {value}"
                     )
                 field_values.add(normalized_value)
-                aliases = _require_text_list(
+                aliases = _require_optional_text_list(
                     value_data["aliases"],
                     f"{reference}.values[{value_index}].aliases",
                 )
                 for alias in (value, *aliases):
                     normalized_alias = alias.casefold()
-                    if normalized_alias in enum_aliases:
+                    if normalized_alias in field_aliases:
                         raise BusinessKnowledgeError(
-                            f"Duplicate enum value alias: {alias}"
+                            f"Duplicate enum value alias for {reference}: {alias}"
                         )
-                    enum_aliases.add(normalized_alias)
+                    field_aliases.add(normalized_alias)
                 enum_values.append(
                     EnumValue(
                         table=table_name,
@@ -582,6 +591,7 @@ def build_business_context(
     descriptions = knowledge.field_descriptions
     matched_terms: list[dict[str, Any]] = []
     related_fields: set[str] = set()
+    related_field_order: dict[str, int] = {}
 
     for term in terms:
         matched_by = [
@@ -598,7 +608,9 @@ def build_business_context(
                 "definition": term.definition,
             }
         )
-        related_fields.update(term.related_fields)
+        for reference in term.related_fields:
+            related_fields.add(reference)
+            related_field_order.setdefault(reference, len(related_field_order))
 
     notes_by_reference = {
         description.reference: description
@@ -615,7 +627,8 @@ def build_business_context(
             }
         )
 
-    enum_matches: list[dict[str, Any]] = []
+    direct_enum_matches: list[dict[str, Any]] = []
+    related_enum_matches: list[tuple[int, str, str, dict[str, Any]]] = []
     for enum_value in sorted(
         knowledge.enum_values,
         key=lambda item: (item.reference, item.value.casefold()),
@@ -627,16 +640,32 @@ def build_business_context(
             for alias in (enum_value.value, *enum_value.aliases)
             if _enum_alias_matches(alias, normalized_question)
         ]
-        if not matched_by:
+        payload = {
+            "table": enum_value.table,
+            "field": enum_value.field,
+            "value": enum_value.value,
+            "matched_by": matched_by,
+        }
+        if matched_by:
+            direct_enum_matches.append(payload)
             continue
-        enum_matches.append(
-            {
-                "table": enum_value.table,
-                "field": enum_value.field,
-                "value": enum_value.value,
-                "matched_by": matched_by,
-            }
-        )
+        if (
+            knowledge.knowledge_source == "schema-derived"
+            and enum_value.reference in related_fields
+        ):
+            related_enum_matches.append(
+                (
+                    related_field_order[enum_value.reference],
+                    enum_value.reference,
+                    enum_value.value.casefold(),
+                    payload,
+                )
+            )
+
+    related_enum_matches.sort(key=lambda item: item[:3])
+    enum_matches = direct_enum_matches + [
+        payload for _order, _reference, _value, payload in related_enum_matches
+    ]
 
     return {
         "schema_version": BUSINESS_CONTEXT_SCHEMA_VERSION,

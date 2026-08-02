@@ -288,7 +288,7 @@ class ProviderContractTests(unittest.TestCase):
                         "provider": "local-intent-policy",
                         "requested_model": "deepseek-v4-flash",
                         "provider_called": False,
-                        "policy_schema_version": "intent-policy-v2",
+                        "policy_schema_version": "intent-policy-v3",
                         "policy_rule_id": rule_id,
                         "action": action,
                         "reason": caught.exception.receipt["reason"],

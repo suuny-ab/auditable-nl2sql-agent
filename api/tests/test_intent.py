@@ -11,6 +11,10 @@ from auditable_nl2sql import (
     execute_read_only,
 )
 from auditable_nl2sql.demo import create_demo_database
+from evals.contract import load_cases, validate_case_contract
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class IntentPolicyTests(unittest.TestCase):
@@ -36,6 +40,22 @@ class IntentPolicyTests(unittest.TestCase):
         self.assertIsNotNone(decision)
         self.assertEqual(decision.action, "clarify")
         self.assertEqual(decision.rule_id, "revenue-scope-required")
+
+    def test_unscoped_revenue_synonyms_and_wrappers_require_clarification(self) -> None:
+        questions = (
+            "请给出销售收入总额。",
+            "一共卖了多少钱？",
+            "我想查询销售额。",
+            "请问成交额。",
+            "我想知道销售总额。",
+        )
+
+        for question in questions:
+            with self.subTest(question=question):
+                decision = classify_question_intent(question)
+                self.assertIsNotNone(decision)
+                self.assertEqual(decision.action, "clarify")
+                self.assertEqual(decision.rule_id, "revenue-scope-required")
 
     def test_best_seller_without_metric_requires_clarification(self) -> None:
         decision = classify_question_intent("最畅销的商品是什么？")
@@ -84,13 +104,21 @@ class IntentPolicyTests(unittest.TestCase):
         )
 
     def test_scoped_success_questions_continue_to_provider(self) -> None:
-        questions = (
-            "2026年第一季度非取消订单销售额是多少？",
-            "非取消订单按销售渠道统计销售额，结果从高到低是什么？",
-            "按非取消订单销售额计算，销售额最高的商品是什么？",
-            "非取消订单按客户统计销售额，排名是什么？",
-            "按销售数量计算，最畅销的商品是什么？",
+        cases = load_cases(PROJECT_ROOT / "evals/cases.jsonl")
+        validate_case_contract(cases)
+        questions = [
+            case["question"] for case in cases if case["category"] == "success"
+        ]
+        questions.extend(
+            (
+                "2026年第一季度销售收入总额是多少？",
+                "按地区列出销售总额。",
+                "明确查询全部数据的成交额。",
+                "2026年一季度一共卖了多少钱？",
+            )
         )
+
+        self.assertEqual(len(questions), 20)
 
         for question in questions:
             with self.subTest(question=question):

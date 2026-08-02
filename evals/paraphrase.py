@@ -16,6 +16,9 @@ from evals.contract import DatasetContractError, load_cases, validate_case_contr
 PARAPHRASE_DATASET_SCHEMA_VERSION = "paraphrase-dataset-v1"
 PARAPHRASE_CASE_SCHEMA_VERSION = "paraphrase-case-v1"
 PARAPHRASE_COMPARISON_SCHEMA_VERSION = "paraphrase-comparison-v1"
+PARAPHRASE_RERUN_COMPARISON_SCHEMA_VERSION = (
+    "paraphrase-revenue-rerun-comparison-v1"
+)
 MEANING_PRESERVED_DECLARATION = (
     "Each variant preserves its source question's business meaning, scope, "
     "requested operation, and expected outcome; only the wording changes."
@@ -40,6 +43,18 @@ SOURCE_BASELINE_CORRECTNESS = {
     "injection-001": True,
     "injection-005": True,
 }
+PARAPHRASE_BASELINE_EVALUATION_ID = "paraphrase30-20260802T174944Z"
+PARAPHRASE_BASELINE_REPORT_SHA256 = (
+    "bf28559c905288a1b5bb13f3fb555e6025dde1da3110f0f3f611b4cf867cec10"
+)
+PARAPHRASE_BASELINE_ANSWER_CORRECT = 24
+REVENUE_RERUN_CASE_IDS = frozenset(
+    {
+        "ambiguity-001-p1",
+        "ambiguity-001-p2",
+        "ambiguity-001-p3",
+    }
+)
 _TOP_LEVEL_KEYS = {
     "schema_version",
     "meaning_preserved_declaration",
@@ -240,6 +255,86 @@ def validate_paraphrase_case_contract(cases: Iterable[Mapping[str, Any]]) -> Non
     )
     _require(len(set(case_ids)) == 30, "paraphrase case IDs must be unique")
     _require(len(set(questions)) == 30, "paraphrase questions must be unique")
+
+
+def load_revenue_paraphrase_rerun_cases(
+    dataset_path: str | Path,
+) -> list[dict[str, Any]]:
+    """Load only the three frozen revenue-scope drops for one bounded rerun."""
+
+    cases = [
+        case
+        for case in load_paraphrase_cases(dataset_path)
+        if case["case_id"] in REVENUE_RERUN_CASE_IDS
+    ]
+    validate_revenue_paraphrase_rerun_contract(cases)
+    return cases
+
+
+def validate_revenue_paraphrase_rerun_contract(
+    cases: Iterable[Mapping[str, Any]],
+) -> None:
+    """Validate that a targeted rerun contains exactly the three frozen drops."""
+
+    materialized = list(cases)
+    _require(len(materialized) == 3, "revenue paraphrase rerun must contain three cases")
+    _require(
+        {case.get("case_id") for case in materialized} == REVENUE_RERUN_CASE_IDS,
+        "revenue paraphrase rerun case selection changed",
+    )
+    source = _source_cases()["ambiguity-001"]
+    for case in materialized:
+        _require(isinstance(case, Mapping), "rerun case must be an object")
+        _require(set(case) == _MATERIALIZED_CASE_KEYS, "rerun case fields changed")
+        _require(
+            case["schema_version"] == PARAPHRASE_CASE_SCHEMA_VERSION,
+            f"{case['case_id']}: rerun schema changed",
+        )
+        _require(
+            case["source_case_id"] == "ambiguity-001",
+            f"{case['case_id']}: rerun source changed",
+        )
+        _require(case["meaning_preserved"] is True, "rerun meaning declaration missing")
+        for key in ("category", "reference_sql", "expected"):
+            _require(case[key] == source[key], f"{case['case_id']}: {key} changed")
+
+
+def summarize_revenue_paraphrase_rerun(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Project one targeted rerun onto the frozen 24/30 paraphrase baseline."""
+
+    cases = report.get("cases")
+    if not isinstance(cases, list) or len(cases) != 3:
+        raise ValueError("revenue paraphrase rerun report must contain three cases")
+    if {case.get("case_id") for case in cases} != REVENUE_RERUN_CASE_IDS:
+        raise ValueError("revenue paraphrase rerun report case selection changed")
+    rerun_correct = sum(
+        case.get("adjudication", {}).get("answer_correct") is True
+        for case in cases
+    )
+    return {
+        "schema_version": PARAPHRASE_RERUN_COMPARISON_SCHEMA_VERSION,
+        "baseline": {
+            "evaluation_id": PARAPHRASE_BASELINE_EVALUATION_ID,
+            "report_sha256": PARAPHRASE_BASELINE_REPORT_SHA256,
+            "selected_answer_correctness": {"numerator": 0, "denominator": 3},
+            "full_answer_correctness": {
+                "numerator": PARAPHRASE_BASELINE_ANSWER_CORRECT,
+                "denominator": 30,
+            },
+        },
+        "rerun": {
+            "evaluation_id": report.get("evaluation_id"),
+            "selected_answer_correctness": {
+                "numerator": rerun_correct,
+                "denominator": 3,
+            },
+            "projected_full_answer_correctness": {
+                "numerator": PARAPHRASE_BASELINE_ANSWER_CORRECT + rerun_correct,
+                "denominator": 30,
+            },
+            "correctness_delta": rerun_correct,
+        },
+    }
 
 
 def summarize_paraphrase_report(report: Mapping[str, Any]) -> dict[str, Any]:

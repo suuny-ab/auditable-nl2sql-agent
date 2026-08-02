@@ -46,13 +46,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _metric(numerator: int, denominator: int) -> dict[str, int | float]:
-    if denominator <= 0:
-        raise EvaluationRunnerError("metric denominator must be positive")
+def _metric(numerator: int, denominator: int) -> dict[str, int | float | None]:
+    if denominator < 0 or numerator < 0 or numerator > denominator:
+        raise EvaluationRunnerError("metric counts are invalid")
     return {
         "numerator": numerator,
         "denominator": denominator,
-        "value": numerator / denominator,
+        "value": None if denominator == 0 else numerator / denominator,
     }
 
 
@@ -341,7 +341,12 @@ def main() -> None:
     parser.add_argument("--dataset", type=Path, default=Path("evals/cases.jsonl"))
     parser.add_argument(
         "--dataset-contract",
-        choices=("frozen40", "schema-holdout-v1", "paraphrase-v1"),
+        choices=(
+            "frozen40",
+            "schema-holdout-v1",
+            "paraphrase-v1",
+            "paraphrase-revenue-v1",
+        ),
         default="frozen40",
     )
     parser.add_argument("--business-database", required=True, type=Path)
@@ -372,6 +377,14 @@ def main() -> None:
 
         case_validator = validate_paraphrase_case_contract
         case_loader = load_paraphrase_cases
+    elif arguments.dataset_contract == "paraphrase-revenue-v1":
+        from evals.paraphrase import (
+            load_revenue_paraphrase_rerun_cases,
+            validate_revenue_paraphrase_rerun_contract,
+        )
+
+        case_validator = validate_revenue_paraphrase_rerun_contract
+        case_loader = load_revenue_paraphrase_rerun_cases
     report = run_model_evaluation(
         arguments.dataset,
         business_database=arguments.business_database,

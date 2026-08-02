@@ -6,19 +6,34 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
+from auditable_nl2sql import DeepSeekSqlGenerator
 from auditable_nl2sql.demo import create_demo_database
 from evals.contract import DatasetContractError, validate_reference_cases
 from evals.paraphrase import (
+    REVENUE_RERUN_CASE_IDS,
     REWRITE_STYLES,
     SOURCE_BASELINE_CORRECTNESS,
     load_paraphrase_cases,
+    load_revenue_paraphrase_rerun_cases,
     summarize_paraphrase_report,
+    summarize_revenue_paraphrase_rerun,
     validate_paraphrase_case_contract,
+    validate_revenue_paraphrase_rerun_contract,
 )
+from evals.runner import run_model_evaluation
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATASET_PATH = PROJECT_ROOT / "evals" / "paraphrase_cases.json"
+
+
+class NoNetworkTransport:
+    def __init__(self) -> None:
+        self.calls: list[object] = []
+
+    def complete(self, request_payload: object) -> object:
+        self.calls.append(request_payload)
+        raise AssertionError("targeted local-intent rerun must not call transport")
 
 
 class ParaphraseEvaluationContractTests(unittest.TestCase):
@@ -93,6 +108,75 @@ class ParaphraseEvaluationContractTests(unittest.TestCase):
         )
         self.assertEqual(comparison["dropped_variants"], ["success-001-p1"])
         self.assertEqual(comparison["improved_variants"], ["success-013-p1"])
+
+    def test_revenue_rerun_contract_selects_only_the_three_frozen_drops(self) -> None:
+        cases = load_revenue_paraphrase_rerun_cases(DATASET_PATH)
+
+        validate_revenue_paraphrase_rerun_contract(cases)
+
+        self.assertEqual({case["case_id"] for case in cases}, REVENUE_RERUN_CASE_IDS)
+        self.assertTrue(all(case["source_case_id"] == "ambiguity-001" for case in cases))
+        changed = copy.deepcopy(cases)
+        changed[0]["case_id"] = "ambiguity-006-p1"
+        with self.assertRaises(DatasetContractError):
+            validate_revenue_paraphrase_rerun_contract(changed)
+
+    def test_revenue_rerun_comparison_projects_only_selected_improvements(self) -> None:
+        report = {
+            "evaluation_id": "revenue-rerun-test",
+            "cases": [
+                {
+                    "case_id": case_id,
+                    "adjudication": {"answer_correct": True},
+                }
+                for case_id in sorted(REVENUE_RERUN_CASE_IDS)
+            ],
+        }
+
+        comparison = summarize_revenue_paraphrase_rerun(report)
+
+        self.assertEqual(
+            comparison["baseline"]["full_answer_correctness"],
+            {"numerator": 24, "denominator": 30},
+        )
+        self.assertEqual(
+            comparison["rerun"]["selected_answer_correctness"],
+            {"numerator": 3, "denominator": 3},
+        )
+        self.assertEqual(
+            comparison["rerun"]["projected_full_answer_correctness"],
+            {"numerator": 27, "denominator": 30},
+        )
+        self.assertEqual(comparison["rerun"]["correctness_delta"], 3)
+
+    def test_revenue_rerun_supports_a_zero_success_subset_without_network(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            business = create_demo_database(root / "business.sqlite3")
+            transport = NoNetworkTransport()
+            generator = DeepSeekSqlGenerator(enabled=True, transport=transport)
+
+            report = run_model_evaluation(
+                DATASET_PATH,
+                business_database=business,
+                checkpoint_database=root / "workflow.sqlite3",
+                generator=generator,
+                evaluation_id="revenue-local",
+                case_validator=validate_revenue_paraphrase_rerun_contract,
+                case_loader=load_revenue_paraphrase_rerun_cases,
+            )
+
+        self.assertEqual(transport.calls, [])
+        self.assertEqual(
+            report["metrics"]["execution_success_rate"],
+            {"numerator": 0, "denominator": 0, "value": None},
+        )
+        self.assertEqual(
+            report["metrics"]["answer_correctness"],
+            {"numerator": 3, "denominator": 3, "value": 1.0},
+        )
+        self.assertEqual(report["provider_usage"]["reported_case_count"], 0)
+        self.assertEqual(report["safety"]["non_success_execution_attempts"], 0)
 
 
 if __name__ == "__main__":

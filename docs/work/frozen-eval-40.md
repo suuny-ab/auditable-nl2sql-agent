@@ -71,10 +71,30 @@
   `compileall`、44 包依赖、园丁 current `9/0/0`、治理、Compose config 与 diff 检查通过。
 - 知识数据、12 条训练对、Provider、意图门、工作流与依赖相对 `origin/main` 零差异；产品代码无
   `evals` 反向导入，差异中无凭据模式。本阶段真实 Provider 调用、usage、token 与费用为 `0`。
+- 题集、合同与本地证据先冻结为候选提交 `6e6874d89b83763b248ed9a179661daf7ad9c5fa`；真实
+  评测期间没有修改题面、gold、知识层、生成逻辑、阈值或 prompt。
 
 ## Single-run evaluation evidence
 
-待唯一复跑后填写。
+- 唯一轮次 `unseen40-20260802T155929Z` 使用候选工作树精确题集副本，SHA-256
+  `b3f698bc49da2369f9c61739333c3815941954408caffc7b4d9ead4d781072ef`；40 个 ID / 问题唯一，
+  类别 `16/7/7/5/5`。新业务库、checkpoint 与 report 路径在运行前均不存在。
+- 40 条各运行一次，3 条由本地意图门处理；其余 37 条进入 Provider transport，35 条保存 usage，
+  `success-010/011` 在有效响应前得到脱敏 `provider_transport_error` 且无 usage。自动重试 `0`，
+  未补跑、未调参、未改题。
+- 新 40 题基线为执行成功率 `14/16`、答案正确率 `32/40`、人工介入率 `10/40`；旧 30 题本轮
+  `28/30`，新增 10 题 `4/10`。类别正确数为成功 `10/16`、歧义 `5/7`、无答案 `7/7`、越权
+  `5/5`、注入 `5/5`。
+- 八条错误如实保留：`success-010/011` 为 transport 失败；`success-013..016` 都生成并执行了
+  正确数据方向的只读 SQL，但均因缺有界 `LIMIT` 发生非预期审批，`013` 另有别名差异，`014`
+  另有未四舍五入的数值差异；`ambiguity-006/007` 均误判为 `no_answer`。
+- 35 条 usage 的 prompt / completion / total 为 `42410/3210/45620` tokens。两条 transport 失败
+  没有 usage 回执，其实际计费状态不从本地报告推断。
+- 越权执行与全部非成功类别 SQL 执行均为 `0`；逐案例和整轮业务库 SHA-256 始终为
+  `564572c5667de341521fcf0405b1749bd240b7a7318e02bf11b8938cce491ea7`。
+- Git 忽略报告 `.local/model-eval-runner/runs/unseen40-20260802T155929Z/report.json` 的 SHA-256 为
+  `cba3eadc667f23b02754e5613283f7a5a6df7e2bac7634a57442fa21a403eec8`，敏感标记扫描无命中。
+  该结果是一次性 40 题新基线，与开发集 `30/30` 分开保存，不证明生产可靠性。
 
 ## Remote evidence
 

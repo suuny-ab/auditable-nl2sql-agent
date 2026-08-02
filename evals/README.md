@@ -56,3 +56,10 @@ total tokens 从 `32969` 增至 `34473`，自动重试 `0`。越权与全部非�
 真实 Provider usage `27` 条、自动重试 `0`、合计 `35050` tokens。越权与全部非成功 SQL 执行仍
 为 `0`，业务库哈希不变；该结果只证明已见错误被修复，不构成新的未见或泛化证据。完整边界见
 [`docs/work/unseen-success-fix.md`](../docs/work/unseen-success-fix.md)。
+
+前 30 条保持不变并再新增 10 条高难题后，唯一轮次 `unseen40-20260802T155929Z` 形成独立 40 题
+基线：执行成功率 `14/16`、答案正确率 `32/40`、人工介入率 `10/40`；37 条进入 Provider
+transport，35 条保存 usage，自动重试 `0`，合计 `45620` tokens。两条旧成功题 transport 失败；
+新增 10 题正确 `4/10`。越权与全部非成功 SQL 执行均为 `0`，业务库哈希不变；本轮不补跑、不修
+题，与开发集 `30/30` 分开保存。完整边界见
+[`docs/work/frozen-eval-40.md`](../docs/work/frozen-eval-40.md)。

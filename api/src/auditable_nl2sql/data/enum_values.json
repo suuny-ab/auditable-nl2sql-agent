@@ -1,0 +1,66 @@
+{
+  "schema_version": "enum-values-v1",
+  "tables": [
+    {
+      "name": "customers",
+      "fields": [
+        {
+          "name": "region",
+          "values": [
+            {"value": "华东", "aliases": ["华东地区", "华东区域"]},
+            {"value": "华南", "aliases": ["华南地区", "华南区域"]},
+            {"value": "华北", "aliases": ["华北地区", "华北区域"]},
+            {"value": "西南", "aliases": ["西南地区", "西南区域"]}
+          ]
+        },
+        {
+          "name": "segment",
+          "values": [
+            {"value": "企业", "aliases": ["企业客户", "企业客群"]},
+            {"value": "零售", "aliases": ["零售客户", "零售客群"]}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "products",
+      "fields": [
+        {
+          "name": "category",
+          "values": [
+            {"value": "户外", "aliases": ["户外用品", "户外类"]},
+            {"value": "家居", "aliases": ["家居用品", "家居类"]},
+            {"value": "数码", "aliases": ["数码产品", "数码类"]},
+            {"value": "办公", "aliases": ["办公用品", "办公类"]}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "fields": [
+        {
+          "name": "status",
+          "values": [
+            {"value": "paid", "aliases": ["已支付", "已付款"]},
+            {"value": "shipped", "aliases": ["已发货", "运输中"]},
+            {"value": "completed", "aliases": ["已完成", "完成订单"]},
+            {"value": "cancelled", "aliases": ["已取消", "取消订单"]}
+          ]
+        },
+        {
+          "name": "sales_channel",
+          "values": [
+            {"value": "online", "aliases": ["线上", "在线渠道", "官网"]},
+            {"value": "store", "aliases": ["门店", "线下门店"]},
+            {"value": "marketplace", "aliases": ["电商平台", "第三方平台", "平台渠道"]}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "order_items",
+      "fields": []
+    }
+  ]
+}

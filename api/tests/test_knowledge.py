@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import replace
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import auditable_nl2sql.knowledge as knowledge_module
 from auditable_nl2sql import (
     BUSINESS_CONTEXT_SCHEMA_VERSION,
+    BusinessKnowledgeError,
+    ENUM_VALUE_MAX_MATCHES,
     TRAINING_PAIR_MAX_MATCHES,
     TRAINING_PAIR_SIMILARITY_THRESHOLD,
     build_business_context,
+    execute_read_only,
     load_business_knowledge,
     read_schema,
     retrieve_training_examples,
@@ -104,6 +110,90 @@ class BusinessKnowledgeTests(unittest.TestCase):
             )
         )
 
+    def test_enum_values_cover_only_closed_fields_and_match_the_fixture(self) -> None:
+        knowledge = load_business_knowledge()
+        self.assertEqual(
+            set(knowledge.enum_tables),
+            {"customers", "products", "orders", "order_items"},
+        )
+        self.assertEqual(len(knowledge.enum_values), 17)
+        self.assertLess(ENUM_VALUE_MAX_MATCHES, len(knowledge.enum_values))
+
+        expected = {
+            "customers.region": {"华东", "华南", "华北", "西南"},
+            "customers.segment": {"企业", "零售"},
+            "products.category": {"户外", "家居", "数码", "办公"},
+            "orders.status": {"paid", "shipped", "completed", "cancelled"},
+            "orders.sales_channel": {"online", "store", "marketplace"},
+        }
+        indexed: dict[str, set[str]] = {}
+        aliases: list[str] = []
+        for enum_value in knowledge.enum_values:
+            indexed.setdefault(enum_value.reference, set()).add(enum_value.value)
+            aliases.extend(
+                alias.casefold()
+                for alias in (enum_value.value, *enum_value.aliases)
+            )
+        self.assertEqual(indexed, expected)
+        self.assertEqual(len(aliases), len(set(aliases)))
+        self.assertFalse(
+            any(reference.startswith("order_items.") for reference in indexed)
+        )
+
+        for reference, values in expected.items():
+            table, field = reference.split(".")
+            result = execute_read_only(
+                self.database,
+                f'SELECT DISTINCT "{field}" FROM "{table}" ORDER BY "{field}"',
+            )
+            self.assertFalse(result.truncated)
+            self.assertEqual({row[0] for row in result.rows}, values)
+
+    def test_enum_value_contract_rejects_unknowns_and_duplicates(self) -> None:
+        resource_names = (
+            "business_terms.json",
+            "field_descriptions.json",
+            "enum_values.json",
+            "training_pairs.json",
+        )
+        resources = {
+            name: copy.deepcopy(knowledge_module._read_resource(name))
+            for name in resource_names
+        }
+        invalid_payloads = []
+
+        unknown_root = copy.deepcopy(resources["enum_values.json"])
+        unknown_root["unexpected"] = True
+        invalid_payloads.append(unknown_root)
+
+        unknown_field = copy.deepcopy(resources["enum_values.json"])
+        unknown_field["tables"][0]["fields"][0]["name"] = "not_a_field"
+        invalid_payloads.append(unknown_field)
+
+        duplicate_alias = copy.deepcopy(resources["enum_values.json"])
+        duplicate_alias["tables"][0]["fields"][0]["values"][1]["aliases"][0] = (
+            "华东"
+        )
+        invalid_payloads.append(duplicate_alias)
+
+        for invalid_enum_values in invalid_payloads:
+            with self.subTest(invalid_enum_values=invalid_enum_values):
+                knowledge_module.load_business_knowledge.cache_clear()
+
+                def fake_read_resource(name: str) -> object:
+                    if name == "enum_values.json":
+                        return invalid_enum_values
+                    return resources[name]
+
+                with patch.object(
+                    knowledge_module,
+                    "_read_resource",
+                    side_effect=fake_read_resource,
+                ):
+                    with self.assertRaises(BusinessKnowledgeError):
+                        knowledge_module.load_business_knowledge()
+        knowledge_module.load_business_knowledge.cache_clear()
+
     def test_similar_question_recalls_enabled_training_pair(self) -> None:
         examples = retrieve_training_examples(
             "2026年第一季度非取消订单的销售额是多少？"
@@ -162,15 +252,60 @@ class BusinessKnowledgeTests(unittest.TestCase):
         self.assertNotIn("products.list_price", references)
         self.assertNotIn("customers.segment", references)
 
+    def test_enum_value_matches_are_stable_and_require_an_available_field(self) -> None:
+        question = "华东地区已完成订单有多少笔？"
+        context = build_business_context(question, self.schema)
+
+        self.assertEqual(
+            context["enum_values"],
+            [
+                {
+                    "table": "customers",
+                    "field": "region",
+                    "value": "华东",
+                    "matched_by": ["华东", "华东地区"],
+                },
+                {
+                    "table": "orders",
+                    "field": "status",
+                    "value": "completed",
+                    "matched_by": ["已完成", "完成订单"],
+                },
+            ],
+        )
+
+        schema_without_status = copy.deepcopy(self.schema)
+        orders = next(
+            table for table in schema_without_status if table["name"] == "orders"
+        )
+        orders["columns"] = [
+            column for column in orders["columns"] if column["name"] != "status"
+        ]
+        context_without_status = build_business_context(
+            question,
+            schema_without_status,
+        )
+        self.assertEqual(
+            context_without_status["enum_values"],
+            context["enum_values"][:1],
+        )
+
+        bounded = build_business_context(
+            "华东华南华北西南企业零售户外家居数码办公",
+            self.schema,
+        )
+        self.assertEqual(len(bounded["enum_values"]), ENUM_VALUE_MAX_MATCHES)
+
     def test_no_match_produces_an_empty_bounded_context(self) -> None:
         context = build_business_context("明天会下雨吗？", self.schema)
 
         self.assertEqual(
             context,
             {
-                "schema_version": "business-context-v2",
+                "schema_version": "business-context-v3",
                 "matched_terms": [],
                 "field_notes": [],
+                "enum_values": [],
                 "training_examples": [],
             },
         )

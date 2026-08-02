@@ -11,10 +11,12 @@ from importlib import resources
 from typing import Any
 
 
-BUSINESS_CONTEXT_SCHEMA_VERSION = "business-context-v2"
+BUSINESS_CONTEXT_SCHEMA_VERSION = "business-context-v3"
 BUSINESS_TERMS_SCHEMA_VERSION = "business-terms-v1"
+ENUM_VALUES_SCHEMA_VERSION = "enum-values-v1"
 FIELD_DESCRIPTIONS_SCHEMA_VERSION = "field-descriptions-v1"
 TRAINING_PAIRS_SCHEMA_VERSION = "training-pairs-v1"
+ENUM_VALUE_MAX_MATCHES = 8
 TRAINING_PAIR_SIMILARITY_ALGORITHM = "normalized-character-bigram-jaccard-v1"
 TRAINING_PAIR_SIMILARITY_THRESHOLD = 0.72
 TRAINING_PAIR_MAX_MATCHES = 2
@@ -23,6 +25,9 @@ _TABLE_KEYS = {"name", "description", "fields"}
 _FIELD_KEYS = {"name", "description"}
 _SIMILARITY_KEYS = {"algorithm", "threshold", "max_matches"}
 _TRAINING_PAIR_KEYS = {"source_case_id", "question", "sql", "enabled"}
+_ENUM_TABLE_KEYS = {"name", "fields"}
+_ENUM_FIELD_KEYS = {"name", "values"}
+_ENUM_VALUE_KEYS = {"value", "aliases"}
 
 
 class BusinessKnowledgeError(ValueError):
@@ -50,6 +55,18 @@ class FieldDescription:
 
 
 @dataclass(frozen=True)
+class EnumValue:
+    table: str
+    field: str
+    value: str
+    aliases: tuple[str, ...]
+
+    @property
+    def reference(self) -> str:
+        return f"{self.table}.{self.field}"
+
+
+@dataclass(frozen=True)
 class TrainingPair:
     source_case_id: str
     question: str
@@ -61,6 +78,8 @@ class TrainingPair:
 class BusinessKnowledge:
     terms: tuple[BusinessTerm, ...]
     field_descriptions: tuple[FieldDescription, ...]
+    enum_tables: tuple[str, ...]
+    enum_values: tuple[EnumValue, ...]
     training_pairs: tuple[TrainingPair, ...]
 
 
@@ -107,7 +126,7 @@ def _require_text_list(value: object, label: str) -> tuple[str, ...]:
 
 @lru_cache(maxsize=1)
 def load_business_knowledge() -> BusinessKnowledge:
-    """Load and strictly validate the two immutable packaged knowledge files."""
+    """Load and strictly validate the immutable packaged knowledge files."""
 
     term_payload = _require_keys(
         _read_resource("business_terms.json"),
@@ -217,6 +236,101 @@ def load_business_knowledge() -> BusinessKnowledge:
             f"Business terms reference unknown fields: {unknown_references}"
         )
 
+    enum_payload = _require_keys(
+        _read_resource("enum_values.json"),
+        {"schema_version", "tables"},
+        "enum values root",
+    )
+    if enum_payload["schema_version"] != ENUM_VALUES_SCHEMA_VERSION:
+        raise BusinessKnowledgeError("Unsupported enum values schema version")
+    raw_enum_tables = enum_payload["tables"]
+    if not isinstance(raw_enum_tables, list) or not raw_enum_tables:
+        raise BusinessKnowledgeError("Enum values must contain tables")
+
+    enum_tables: list[str] = []
+    enum_fields: set[str] = set()
+    enum_aliases: set[str] = set()
+    enum_values: list[EnumValue] = []
+    for table_index, raw_table in enumerate(raw_enum_tables):
+        table_data = _require_keys(
+            raw_table,
+            _ENUM_TABLE_KEYS,
+            f"enum_table[{table_index}]",
+        )
+        table_name = _require_text(
+            table_data["name"],
+            f"enum_table[{table_index}].name",
+        )
+        if table_name in enum_tables:
+            raise BusinessKnowledgeError(f"Duplicate enum table: {table_name}")
+        enum_tables.append(table_name)
+        raw_fields = table_data["fields"]
+        if not isinstance(raw_fields, list):
+            raise BusinessKnowledgeError(f"{table_name}.enum fields must be a list")
+        for field_index, raw_field in enumerate(raw_fields):
+            field_data = _require_keys(
+                raw_field,
+                _ENUM_FIELD_KEYS,
+                f"{table_name}.enum_fields[{field_index}]",
+            )
+            field_name = _require_text(
+                field_data["name"],
+                f"{table_name}.enum_fields[{field_index}].name",
+            )
+            reference = f"{table_name}.{field_name}"
+            if reference not in field_references:
+                raise BusinessKnowledgeError(
+                    f"Enum values reference unknown field: {reference}"
+                )
+            if reference in enum_fields:
+                raise BusinessKnowledgeError(f"Duplicate enum field: {reference}")
+            enum_fields.add(reference)
+            raw_values = field_data["values"]
+            if not isinstance(raw_values, list) or not raw_values:
+                raise BusinessKnowledgeError(
+                    f"{reference}.values must be a non-empty list"
+                )
+            field_values: set[str] = set()
+            for value_index, raw_value in enumerate(raw_values):
+                value_data = _require_keys(
+                    raw_value,
+                    _ENUM_VALUE_KEYS,
+                    f"{reference}.values[{value_index}]",
+                )
+                value = _require_text(
+                    value_data["value"],
+                    f"{reference}.values[{value_index}].value",
+                )
+                normalized_value = value.casefold()
+                if normalized_value in field_values:
+                    raise BusinessKnowledgeError(
+                        f"Duplicate enum value for {reference}: {value}"
+                    )
+                field_values.add(normalized_value)
+                aliases = _require_text_list(
+                    value_data["aliases"],
+                    f"{reference}.values[{value_index}].aliases",
+                )
+                for alias in (value, *aliases):
+                    normalized_alias = alias.casefold()
+                    if normalized_alias in enum_aliases:
+                        raise BusinessKnowledgeError(
+                            f"Duplicate enum value alias: {alias}"
+                        )
+                    enum_aliases.add(normalized_alias)
+                enum_values.append(
+                    EnumValue(
+                        table=table_name,
+                        field=field_name,
+                        value=value,
+                        aliases=aliases,
+                    )
+                )
+    if set(enum_tables) != table_names:
+        raise BusinessKnowledgeError(
+            "Enum values must declare every described synthetic table"
+        )
+
     training_payload = _require_keys(
         _read_resource("training_pairs.json"),
         {"schema_version", "similarity", "pairs"},
@@ -283,6 +397,8 @@ def load_business_knowledge() -> BusinessKnowledge:
     return BusinessKnowledge(
         terms=tuple(terms),
         field_descriptions=tuple(descriptions),
+        enum_tables=tuple(enum_tables),
+        enum_values=tuple(enum_values),
         training_pairs=tuple(training_pairs),
     )
 
@@ -324,6 +440,19 @@ def _bigram_jaccard(left: frozenset[str], right: frozenset[str]) -> float:
     if not left or not right:
         return 0.0
     return len(left & right) / len(left | right)
+
+
+def _enum_alias_matches(alias: str, normalized_question: str) -> bool:
+    normalized_alias = alias.casefold()
+    if re.fullmatch(r"[a-z0-9_]+", normalized_alias):
+        return (
+            re.search(
+                rf"(?<![a-z0-9_]){re.escape(normalized_alias)}(?![a-z0-9_])",
+                normalized_question,
+            )
+            is not None
+        )
+    return normalized_alias in normalized_question
 
 
 def retrieve_training_examples(
@@ -407,10 +536,34 @@ def build_business_context(
             }
         )
 
+    enum_matches: list[dict[str, Any]] = []
+    for enum_value in sorted(
+        knowledge.enum_values,
+        key=lambda item: (item.reference, item.value.casefold()),
+    ):
+        if enum_value.reference not in available_fields:
+            continue
+        matched_by = [
+            alias
+            for alias in (enum_value.value, *enum_value.aliases)
+            if _enum_alias_matches(alias, normalized_question)
+        ]
+        if not matched_by:
+            continue
+        enum_matches.append(
+            {
+                "table": enum_value.table,
+                "field": enum_value.field,
+                "value": enum_value.value,
+                "matched_by": matched_by,
+            }
+        )
+
     return {
         "schema_version": BUSINESS_CONTEXT_SCHEMA_VERSION,
         "matched_terms": matched_terms,
         "field_notes": field_notes,
+        "enum_values": enum_matches[:ENUM_VALUE_MAX_MATCHES],
         "training_examples": retrieve_training_examples(
             question,
             training_pairs=knowledge.training_pairs,
